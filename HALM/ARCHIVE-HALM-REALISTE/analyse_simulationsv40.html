@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyse et Comparaison des Simulations de Drones</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f9;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        /* Styles pour les watermarks discrets */
+        .watermark {
+            position: fixed;
+            z-index: 9999;
+            font-size: 12px;
+            color: rgba(0, 0, 0, 0.3); /* Couleur discrète */
+            pointer-events: none; /* Empêche de cliquer dessus */
+            user-select: none; /* Empêche de le sélectionner */
+        }
+        .watermark.top {
+            top: 10px;
+            left: 10px;
+        }
+        .watermark.bottom {
+            bottom: 10px;
+            right: 10px;
+        }
+        .container {
+            width: 100%;
+            max-width: 1400px;
+            margin: auto;
+            background: #fff;
+            padding: 25px 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+            text-align: center;
+            font-weight: 300;
+        }
+        h1 {
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-top: 30px;
+            border-top: 1px solid #e0e0e0;
+            padding-top: 20px;
+        }
+        .section-header {
+            background-color: #ecf0f1;
+            padding: 12px 20px;
+            border-left: 5px solid #3498db;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            font-weight: 400;
+        }
+        .toolbar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        select, button {
+            padding: 10px 15px;
+            border-radius: 5px;
+            border: 1px solid #bdc3c7;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        select:focus, button:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+        }
+        .file-input-container {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+        .file-input-container input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+        }
+        button.file-selector-btn {
+            background-color: #2ecc71;
+            color: #fff;
+            border: none;
+        }
+        button#export-pdf-btn {
+            background-color: #e74c3c;
+            color: #fff;
+            border: none;
+        }
+        button#export-pdf-btn:hover {
+            background-color: #c0392b;
+        }
+        .summary-table, .detailed-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .summary-table th, .summary-table td, .detailed-table th, .detailed-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+            transition: background-color 0.3s ease;
+        }
+        .summary-table th, .detailed-table th {
+            background-color: #f2f2f2;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+        .summary-table tr:hover, .detailed-table tr:hover {
+            background-color: #eaf6ff;
+        }
+        .summary-table tfoot td {
+            font-weight: bold;
+            background-color: #e0e0e0;
+        }
+        .status-success {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .status-failure {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            margin-top: 20px;
+        }
+        .no-data {
+            text-align: center;
+            color: #7f8c8d;
+            font-style: italic;
+            padding: 20px;
+        }
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            justify-content: center;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+<div class="watermark top">Designed by Lionnel.Z with 🧠</div>
+<div class="watermark bottom">Designed by Lionnel.Z with 🧠</div>
+
+<div class="container" id="main-content">
+    <h1>Tableau de Bord des Simulations de Drones</h1>
+
+    <div class="toolbar">
+        <label for="file-selector" class="file-input-container">
+            <button class="file-selector-btn">Sélectionner le dossier des simulations</button>
+            <input type="file" id="file-selector" webkitdirectory directory multiple>
+        </label>
+        <span id="file-count-label">Aucun fichier sélectionné</span>
+        <button id="export-pdf-btn">Exporter en PDF</button>
+    </div>
+
+    <div id="loading-message" style="display: none; text-align: center;">
+        <p>Lecture des fichiers...</p>
+    </div>
+    
+    <div id="error-message" style="display: none; text-align: center; color: red;">
+        <p>Erreur: Aucun fichier de simulation trouvé dans le dossier sélectionné.</p>
+    </div>
+
+    <div id="analysis-section" style="display: none;">
+        <div class="section">
+            <h2 class="section-header">Synthèse des Simulations Sélectionnées</h2>
+            <div id="summary-table-container"></div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-header">Graphiques Comparatifs</h2>
+            <div class="chart-grid">
+                <div>
+                    <h3>Temps de Découverte de l'Homme à la mer</h3>
+                    <div class="chart-container"><canvas id="discoveryTimeChart"></canvas></div>
+                </div>
+                <div>
+                    <h3>Taux d'Épuisement (%)</h3>
+                    <div class="chart-container"><canvas id="exhaustionRateChart"></canvas></div>
+                </div>
+                <div>
+                    <h3>Communications Échouées</h3>
+                    <div class="chart-container"><canvas id="failedCommsChart"></canvas></div>
+                </div>
+                <div>
+                    <h3>Taux de réussite des communications par type de drone</h3>
+                    <div class="chart-container"><canvas id="commRateChart"></canvas></div>
+                </div>
+                <div>
+                    <h3>Zones découvertes par drone (Moyenne)</h3>
+                    <div class="chart-container"><canvas id="zonesDiscoveredChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-header">Statistiques Détaillées par Simulation</h2>
+            <div id="detailed-stats-container"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+let loadedData = [];
+let charts = {};
+
+document.getElementById('file-selector').addEventListener('change', async (event) => {
+    const files = event.target.files;
+    const fileCountLabel = document.getElementById('file-count-label');
+    const loadingMessage = document.getElementById('loading-message');
+    const errorMessage = document.getElementById('error-message');
+    const analysisSection = document.getElementById('analysis-section');
+
+    if (files.length === 0) {
+        fileCountLabel.textContent = 'Aucun fichier sélectionné';
+        analysisSection.style.display = 'none';
+        return;
+    }
+
+    loadingMessage.style.display = 'block';
+    errorMessage.style.display = 'none';
+    analysisSection.style.display = 'none';
+
+    loadedData = [];
+    const jsonPromises = [];
+
+    for (const file of files) {
+        if (file.name.startsWith('sim') && file.name.endsWith('.json')) {
+            jsonPromises.push(new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        data.fileName = file.name;
+                        resolve(data);
+                    } catch (error) {
+                        console.error(`Erreur de lecture pour le fichier ${file.name}:`, error);
+                        resolve(null);
+                    }
+                };
+                reader.readAsText(file);
+            }));
+        }
+    }
+
+    loadedData = (await Promise.all(jsonPromises)).filter(data => data !== null);
+
+    loadingMessage.style.display = 'none';
+    fileCountLabel.textContent = `${loadedData.length} fichiers de simulation trouvés`;
+
+    if (loadedData.length > 0) {
+        renderUI();
+        analysisSection.style.display = 'block';
+    } else {
+        errorMessage.style.display = 'block';
+    }
+});
+
+document.getElementById('export-pdf-btn').addEventListener('click', () => {
+    const element = document.getElementById('main-content');
+    const opt = {
+        margin:       10,
+        filename:     'rapport_simulations.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+    html2pdf().set(opt).from(element).save();
+});
+
+
+function renderUI() {
+    renderSummaryTable();
+    renderDetailedStats();
+    renderCharts();
+}
+
+function renderSummaryTable() {
+    const container = document.getElementById('summary-table-container');
+    if (loadedData.length === 0) {
+        container.innerHTML = '<p class="no-data">Aucune donnée à afficher.</p>';
+        return;
+    }
+
+    let totalDuration = 0, totalDronesSurface = 0, totalDronesAerien = 0,
+        totalExhaustionRate = 0, totalCommSuccessRate = 0, totalZonesPerDrone = 0,
+        totalDiscoveryTime = 0, totalDiscoveryTimeCount = 0,
+        totalCommsSS = 0, totalCommsSA = 0, totalCommsAA = 0,
+        totalBrouillageReel = 0, totalBrouillageReelCount = 0,
+        successCount = 0, failureCount = 0; // Ajout pour le ratio succès/échec
+
+    let tableHTML = `
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>Simulation</th>
+                    <th>Statut</th>
+                    <th>Durée (s)</th>
+                    <th>Temps Découverte (s)</th>
+                    <th>Drones Surface</th>
+                    <th>Drones Aériens</th>
+                    <th>Taux d'épuisement (%)</th>
+                    <th>Zones / Drone</th>
+                    <th>Taux Comms (%)</th>
+                    <th>Comms S-S</th>
+                    <th>Comms S-A</th>
+                    <th>Comms A-A</th>
+                    <th>% Brouillage Réel</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    loadedData.forEach(data => {
+        const status = data.simulation_reussie ? `<span class="status-success">Succès</span>` : `<span class="status-failure">Échec</span>`;
+        if (data.simulation_reussie) {
+            successCount++;
+        } else {
+            failureCount++;
+        }
+
+        const exhaustionRate = data.resultats_globaux.taux_epuisement;
+        const commSuccessRate = data.statistiques_communication.taux_reussite_communication;
+        const comms = data.statistiques_communication.repartition_communications;
+        const discoveryTime = data.temps_decouverte_homme_mer !== null ? data.temps_decouverte_homme_mer.toFixed(2) : 'N/A';
+        const zonesPerDrone = (data.statistiques_drones_surface.zones_decouverte_par_creature + data.statistiques_drones_aerien.zones_decouverte_par_creature) / 2;
+        
+        const brouillageReel = data.configuration.pourcentage_brouillage_reel;
+        let brouillageReelText = 'N/A';
+        if (brouillageReel !== undefined && brouillageReel !== null) {
+            brouillageReelText = `${brouillageReel.toFixed(2)}%`;
+            totalBrouillageReel += brouillageReel;
+            totalBrouillageReelCount++;
+        }
+
+        totalDuration += data.duree_simulation_secondes;
+        totalDronesSurface += data.configuration.nombre_drones_surface;
+        totalDronesAerien += data.configuration.nombre_drones_aerien;
+        totalExhaustionRate += exhaustionRate;
+        totalCommSuccessRate += commSuccessRate;
+        totalCommsSS += comms.surface_avec_surface;
+        totalCommsSA += comms.surface_avec_aerien;
+        totalCommsAA += comms.aerien_avec_aerien;
+        totalZonesPerDrone += zonesPerDrone;
+
+        if (data.simulation_reussie) {
+            totalDiscoveryTime += data.temps_decouverte_homme_mer;
+            totalDiscoveryTimeCount++;
+        }
+        
+        tableHTML += `
+            <tr>
+                <td>${data.fileName}</td>
+                <td>${status}</td>
+                <td>${data.duree_simulation_secondes.toFixed(2)}</td>
+                <td>${discoveryTime}</td>
+                <td>${data.configuration.nombre_drones_surface}</td>
+                <td>${data.configuration.nombre_drones_aerien}</td>
+                <td>${exhaustionRate.toFixed(2)}</td>
+                <td>${zonesPerDrone.toFixed(0)}</td>
+                <td>${commSuccessRate.toFixed(2)}</td>
+                <td>${comms.surface_avec_surface}</td>
+                <td>${comms.surface_avec_aerien}</td>
+                <td>${comms.aerien_avec_aerien}</td>
+                <td>${brouillageReelText}</td>
+            </tr>
+        `;
+    });
+
+    const count = loadedData.length;
+    const averageDuration = totalDuration / count;
+    const averageDronesSurface = totalDronesSurface / count;
+    const averageDronesAerien = totalDronesAerien / count;
+    const averageExhaustionRate = totalExhaustionRate / count;
+    const averageCommSuccessRate = totalCommSuccessRate / count;
+    const averageCommsSS = totalCommsSS / count;
+    const averageCommsSA = totalCommsSA / count;
+    const averageCommsAA = totalCommsAA / count;
+    const averageZonesPerDrone = totalZonesPerDrone / count;
+    const averageDiscoveryTime = totalDiscoveryTimeCount > 0 ? totalDiscoveryTime / totalDiscoveryTimeCount : 'N/A';
+    const averageBrouillageReel = totalBrouillageReelCount > 0 ? totalBrouillageReel / totalBrouillageReelCount : 'N/A';
+    const successFailureText = `${successCount}S / ${failureCount}E`; // Texte pour le ratio
+
+    tableHTML += `
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td>Total / Moyenne</td>
+                    <td>${successFailureText}</td>
+                    <td>${averageDuration.toFixed(2)}</td>
+                    <td>${averageDiscoveryTime !== 'N/A' ? averageDiscoveryTime.toFixed(2) : 'N/A'}</td>
+                    <td>${averageDronesSurface.toFixed(0)}</td>
+                    <td>${averageDronesAerien.toFixed(0)}</td>
+                    <td>${averageExhaustionRate.toFixed(2)}</td>
+                    <td>${averageZonesPerDrone.toFixed(0)}</td>
+                    <td>${averageCommSuccessRate.toFixed(2)}</td>
+                    <td>${averageCommsSS.toFixed(1)}</td>
+                    <td>${averageCommsSA.toFixed(1)}</td>
+                    <td>${averageCommsAA.toFixed(1)}</td>
+                    <td>${averageBrouillageReel !== 'N/A' ? averageBrouillageReel.toFixed(2) + '%' : 'N/A'}</td>
+                </tr>
+            </tfoot>
+        </table>
+    `;
+    container.innerHTML = tableHTML;
+}
+
+function renderDetailedStats() {
+    const container = document.getElementById('detailed-stats-container');
+    container.innerHTML = '';
+    if (loadedData.length === 0) {
+        container.innerHTML = '<p class="no-data">Aucune donnée à afficher.</p>';
+        return;
+    }
+
+    loadedData.forEach(data => {
+        const statsSurface = data.statistiques_drones_surface;
+        const statsAerien = data.statistiques_drones_aerien;
+        
+        let statsHTML = `
+            <h3>Détails pour ${data.fileName}</h3>
+            <table class="detailed-table">
+                <thead>
+                    <tr>
+                        <th>Critère</th>
+                        <th>Drone de Surface</th>
+                        <th>Drone Aérien</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Nombre de drones</td><td>${statsSurface.nombre}</td><td>${statsAerien.nombre}</td></tr>
+                    <tr><td>Drones épuisés</td><td>${statsSurface.epuisees} (${statsSurface.taux_epuisement}%)</td><td>${statsAerien.epuisees} (${statsAerien.taux_epuisement}%)</td></tr>
+                    <tr><td>Trajets complets (total)</td><td>${statsSurface.trajets_complets_total}</td><td>${statsAerien.trajets_complets_total}</td></tr>
+                    <tr><td>Zones découvertes par drone</td><td>${statsSurface.zones_decouverte_par_creature.toFixed(2)}</td><td>${statsAerien.zones_decouverte_par_creature.toFixed(2)}</td></tr>
+                    <tr><td>Tentatives de communication</td><td>${statsSurface.tentatives_totales}</td><td>${statsAerien.tentatives_totales}</td></tr>
+                    <tr><td>Communications réussies (liens)</td><td>${statsSurface['communications_reussies (liens)']}</td><td>${statsAerien['communications_reussies (liens)']}</td></tr>
+                    <tr><td>Communications échouées</td><td>${statsSurface.communications_echouees}</td><td>${statsAerien.communications_echouees}</td></tr>
+                    <tr><td>Taux de réussite des communications</td><td>${statsSurface.taux_reussite_communication.toFixed(2)}%</td><td>${statsAerien.taux_reussite_communication.toFixed(2)}%</td></tr>
+                </tbody>
+            </table>
+        `;
+        container.innerHTML += statsHTML;
+    });
+}
+
+function renderCharts() {
+    // Détruire les anciens graphiques
+    Object.values(charts).forEach(chart => chart.destroy());
+
+    const labels = loadedData.map(d => d.fileName);
+    
+    // Graphique 1: Temps de découverte (uniquement les réussites)
+    const successfulSimulations = loadedData.filter(d => d.simulation_reussie && d.temps_decouverte_homme_mer !== null);
+    const discoveryLabels = successfulSimulations.map(d => d.fileName);
+    const discoveryTimes = successfulSimulations.map(d => d.temps_decouverte_homme_mer);
+    
+    const discoveryCtx = document.getElementById('discoveryTimeChart').getContext('2d');
+    charts.discoveryTime = new Chart(discoveryCtx, {
+        type: 'bar',
+        data: {
+            labels: discoveryLabels,
+            datasets: [{
+                label: 'Temps de découverte (s)',
+                data: discoveryTimes,
+                backgroundColor: 'rgba(52, 152, 219, 0.8)',
+                borderColor: 'rgba(52, 152, 219, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Temps (secondes)'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: (tooltipItems) => {
+                            return `Simulation: ${tooltipItems[0].label}`;
+                        },
+                        label: (context) => {
+                            return `Temps: ${context.raw.toFixed(2)} s`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Graphique 2: Taux d'épuisement (global)
+    const exhaustionRates = loadedData.map(d => d.resultats_globaux.taux_epuisement);
+    const exhaustionCtx = document.getElementById('exhaustionRateChart').getContext('2d');
+    charts.exhaustionRate = new Chart(exhaustionCtx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Taux d\'épuisement (%)',
+                data: exhaustionRates,
+                backgroundColor: 'rgba(231, 76, 60, 0.8)',
+                borderColor: 'rgba(231, 76, 60, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Taux (%)'
+                    },
+                    max: 100
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: (tooltipItems) => {
+                            return `Simulation: ${tooltipItems[0].label}`;
+                        },
+                        label: (context) => {
+                            return `Taux: ${context.raw.toFixed(2)} %`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Graphique 3: Communications échouées (global)
+    const failedComms = loadedData.map(d => d.statistiques_communication.communications_echouees);
+    const failedCommsCtx = document.getElementById('failedCommsChart').getContext('2d');
+    charts.failedComms = new Chart(failedCommsCtx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Communications échouées',
+                data: failedComms,
+                backgroundColor: 'rgba(255, 165, 0, 0.8)',
+                borderColor: 'rgba(255, 165, 0, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Nombre de communications'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: (tooltipItems) => {
+                            return `Simulation: ${tooltipItems[0].label}`;
+                        },
+                        label: (context) => {
+                            return `Nombre: ${context.raw}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Calcul des données pour les nouveaux graphiques comparatifs
+    let commsSurface = 0, commsAerien = 0, commsSurfaceCount = 0, commsAerienCount = 0;
+    let zonesSurface = 0, zonesAerien = 0, zonesSurfaceCount = 0, zonesAerienCount = 0;
+
+    loadedData.forEach(data => {
+        if (data.statistiques_drones_surface.nombre > 0) {
+            commsSurface += data.statistiques_drones_surface.taux_reussite_communication;
+            zonesSurface += data.statistiques_drones_surface.zones_decouverte_par_creature;
+            commsSurfaceCount++;
+            zonesSurfaceCount++;
+        }
+        if (data.statistiques_drones_aerien.nombre > 0) {
+            commsAerien += data.statistiques_drones_aerien.taux_reussite_communication;
+            zonesAerien += data.statistiques_drones_aerien.zones_decouverte_par_creature;
+            commsAerienCount++;
+            zonesAerienCount++;
+        }
+    });
+
+    const avgCommSurface = commsSurfaceCount > 0 ? commsSurface / commsSurfaceCount : 0;
+    const avgCommAerien = commsAerienCount > 0 ? commsAerien / commsAerienCount : 0;
+    const avgZonesSurface = zonesSurfaceCount > 0 ? zonesSurface / zonesSurfaceCount : 0;
+    const avgZonesAerien = zonesAerienCount > 0 ? zonesAerien / zonesAerienCount : 0;
+    
+    // Graphique 4: Taux de réussite des communications par type de drone
+    const commRateCtx = document.getElementById('commRateChart').getContext('2d');
+    charts.commRate = new Chart(commRateCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Drone de Surface', 'Drone Aérien'],
+            datasets: [{
+                label: 'Taux de réussite moyen (%)',
+                data: [avgCommSurface, avgCommAerien],
+                backgroundColor: ['rgba(255, 99, 132, 0.8)', 'rgba(54, 162, 235, 0.8)'],
+                borderColor: ['rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Taux (%)'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            return `Taux de réussite: ${context.raw.toFixed(2)} %`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Graphique 5: Zones découvertes par drone
+    const zonesDiscoveredCtx = document.getElementById('zonesDiscoveredChart').getContext('2d');
+    charts.zonesDiscovered = new Chart(zonesDiscoveredCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Drone de Surface', 'Drone Aérien'],
+            datasets: [{
+                label: 'Zones découvertes par drone',
+                data: [avgZonesSurface, avgZonesAerien],
+                backgroundColor: ['rgba(255, 99, 132, 0.8)', 'rgba(54, 162, 235, 0.8)'],
+                borderColor: ['rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Nombre de zones'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            return `Zones découvertes: ${context.raw.toFixed(2)}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+
+</body>
+</html>

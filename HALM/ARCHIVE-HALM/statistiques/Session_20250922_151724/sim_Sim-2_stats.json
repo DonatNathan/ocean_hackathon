@@ -1,0 +1,92 @@
+{
+  "timestamp": "2025-09-22T15:17:45.532729",
+  "duree_simulation_secondes": 20.67,
+  "simulation_reussie": false,
+  "temps_decouverte_homme_mer": null,
+  "qui_a_trouve_homme_mer": null,
+  "configuration": {
+    "nombre_drones_surface": 5,
+    "nombre_drones_aerien": 5,
+    "spawn_position": [
+      100,
+      100
+    ],
+    "homme_a_la_mer_position": [
+      639,
+      153
+    ],
+    "nombre_obstacles": 64,
+    "nombre_brouillages": 22,
+    "pourcentage_brouillage_reel": 15.69
+  },
+  "resultats_globaux": {
+    "creatures_totales": 10,
+    "creatures_actives": 0,
+    "creatures_epuisees": 10,
+    "taux_epuisement": 100.0,
+    "zones_explorees": 1705,
+    "pourcentage_exploration": 16.91
+  },
+  "statistiques_communication": {
+    "tentatives_totales": 29327,
+    "communications_reussies": 48,
+    "communications_echouees": 7134,
+    "repartition_communications": {
+      "surface_avec_surface": 11,
+      "surface_avec_aerien": 27,
+      "aerien_avec_aerien": 10
+    },
+    "taux_reussite_communication": 0.16,
+    "communications_par_drone": 4.8,
+    "drones_communicants": 10,
+    "taux_drones_communicants": 100.0
+  },
+  "statistiques_drones_surface": {
+    "nombre": 5,
+    "epuisees": 5,
+    "taux_epuisement": 100.0,
+    "trajets_complets_total": 2,
+    "trajets_par_creature": 0.4,
+    "temps_trajet_moyen": 0.47,
+    "distance_moyenne": 831.73,
+    "zones_decouvertes_total": 830,
+    "zones_decouverte_par_creature": 166.0,
+    "vitesse_exploration": 40.16,
+    "ont_trouve_homme_mer": 0,
+    "taux_reussite_homme_mer": 0.0,
+    "temps_moyen_decouverte_homme_mer": null,
+    "communications_reussies (liens)": 49,
+    "communications_par_creature": 9.8,
+    "tentatives_totales": 16964,
+    "communications_echouees": 4901,
+    "taux_reussite_communication": 0.29
+  },
+  "statistiques_drones_aerien": {
+    "nombre": 5,
+    "epuisees": 5,
+    "taux_epuisement": 100.0,
+    "trajets_complets_total": 1,
+    "trajets_par_creature": 0.2,
+    "temps_trajet_moyen": 0.33,
+    "distance_moyenne": 820.38,
+    "zones_decouvertes_total": 2217,
+    "zones_decouverte_par_creature": 443.4,
+    "vitesse_exploration": 107.27,
+    "ont_trouve_homme_mer": 0,
+    "taux_reussite_homme_mer": 0.0,
+    "temps_moyen_decouverte_homme_mer": null,
+    "communications_reussies (liens)": 47,
+    "communications_par_creature": 9.4,
+    "tentatives_totales": 12363,
+    "communications_echouees": 2233,
+    "taux_reussite_communication": 0.38
+  },
+  "comparaison": {
+    "efficacite_drones_surface": 166.0,
+    "efficacite_drones_aerien": 443.4,
+    "temps_decouverte_moyen_surface": null,
+    "temps_decouverte_moyen_aerien": null,
+    "taux_reussite_com_surface": 0.29,
+    "taux_reussite_com_aerien": 0.38
+  }
+}

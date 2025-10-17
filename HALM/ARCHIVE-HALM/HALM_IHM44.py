@@ -1050,7 +1050,6 @@ class Simulation:
         if en_pause:
             font = pygame.font.Font(None, 72)
             text = font.render("PAUSE", True, ROUGE)
-        x
 
 def main():
     global en_pause, afficher_cercles_communication

@@ -13,7 +13,7 @@ pygame.init()
 # Configuration
 LARGEUR = 1200
 HAUTEUR = 900
-FPS = 60
+FPS = 10
 FACTEUR_ACCELERATION = 1
 
 # Couleurs
@@ -163,7 +163,7 @@ class Drone:
             self.couleur_trouve = ROUGE_CLAIR
             self.taille = 3
             self.zone_decouverte = 15
-            self.temps_avant_repos = 40
+            self.temps_avant_repos = 100
             self.duree_repos = 20
             self.rayon_communication = 50
         elif type_creature == "drone_aerien":
@@ -172,7 +172,7 @@ class Drone:
             self.couleur_trouve = BLEU_CLAIR
             self.taille = 4
             self.zone_decouverte = 30
-            self.temps_avant_repos = 20
+            self.temps_avant_repos = 80
             self.duree_repos = 15
             self.rayon_communication = 80
         
@@ -281,169 +281,169 @@ class Drone:
                         communications_etablies += 1
         
         return communications_etablies
-    
+        
     def deplacer(self, obstacles, homme_a_la_mer, autres_creatures, brouillages, simulation):
-        old_state = {
-            "en_repos": self.en_repos,
-            "retour_spawn": self.retour_spawn,
-            "epuise": self.epuise,
-            "a_trouve_homme_mer": self.a_trouve_homme_mer
-        }
-        
         if self.epuise:
+            print("[LOG] Créature épuisée, ne se déplace pas.")
             return
-        
-        self.temps_depuis_spawn += 1/FPS
+
+        self.temps_depuis_spawn += 1 / FPS
 
         if not self.en_repos:
+            print("[LOG] Vérification des communications.")
             self.verifier_communications(autres_creatures, brouillages, simulation)
-        
-        if not self.en_repos and not self.retour_spawn and self.temps_depuis_spawn >= self.temps_avant_repos:
-            self.retour_spawn = True
+
+        if not self.en_repos and not self.retour_spawn and self.temps_depuis_spawn >= self.temps_avant_repos / 2:
+            print("[LOG] Demi-temps atteint, passage en retour vers spawn.")
+            self.passer_en_retour_spawn()
+
+        if self.retour_spawn:
+            print("[LOG] Mode retour vers spawn.")
+            if self.gerer_retour_spawn():
+                print("[LOG] Retour spawn terminé, arrêt déplacement.")
+                return
+
+        elif self.en_repos:
+            print("[LOG] Mode repos.")
+            if self.gerer_repos():
+                print("[LOG] Fin de repos, arrêt déplacement.")
+                return
+
+        else:
+            print("[LOG] Mode exploration.")
+            self.explorer(obstacles, homme_a_la_mer)
+
+        self.mettre_a_jour_position(obstacles)
+        self.detecter_homme_a_la_mer(homme_a_la_mer)
+        self.mettre_a_jour_zones_explorees()
+
+
+    def passer_en_retour_spawn(self):
+        self.retour_spawn = True
+        if self.logger:
+            self.logger.log_event("creature_state_change", {
+                "creature_id": self.creature_id,
+                "creature_type": self.type_creature,
+                "new_state": "retour_spawn",
+                "position": [self.x, self.y],
+                "communications_count": len(self.communications_reçues)
+            })
+
+    def gerer_retour_spawn(self):
+        dist_spawn = math.dist((self.x, self.y), (self.spawn_x, self.spawn_y))
+
+        if dist_spawn < 5:
+            self.entrer_en_repos()
+            return True
+        else:
+            self.angle = math.atan2(self.spawn_y - self.y, self.spawn_x - self.x)
+        return False
+
+    def entrer_en_repos(self):
+        self.en_repos = True
+        self.retour_spawn = False
+        self.temps_repos_debut = time.time()
+        self.x, self.y = self.spawn_x, self.spawn_y
+
+        if self.logger:
+            self.logger.log_event("creature_state_change", {
+                "creature_id": self.creature_id,
+                "creature_type": self.type_creature,
+                "new_state": "en_repos",
+                "position": [self.x, self.y],
+                "communications_count": len(self.communications_reçues)
+            })
+
+        if self.temps_debut_trajet:
+            duree_trajet = time.time() - self.temps_debut_trajet
+            self.temps_trajets.append(duree_trajet)
+            self.trajets_complets += 1
+            if self.logger:
+                self.logger.log_event("trip_completed", {
+                    "creature_id": self.creature_id,
+                    "creature_type": self.type_creature,
+                    "duration": duree_trajet,
+                    "total_trips": self.trajets_complets,
+                    "communications_during_trip": len(self.communications_reçues)
+                })
+
+    def gerer_repos(self):
+        temps_repos_actuel = time.time() - self.temps_repos_debut
+        if temps_repos_actuel >= self.duree_repos:
+            self.en_repos = False
+            self.temps_depuis_spawn = 0
+            self.temps_debut_trajet = time.time()
+
             if self.logger:
                 self.logger.log_event("creature_state_change", {
                     "creature_id": self.creature_id,
                     "creature_type": self.type_creature,
-                    "new_state": "retour_spawn",
+                    "new_state": "exploration",
                     "position": [self.x, self.y],
                     "communications_count": len(self.communications_reçues)
                 })
-        
-        if self.retour_spawn:
-            dist_spawn = math.sqrt((self.x - self.spawn_x)**2 + (self.y - self.spawn_y)**2)
-            
-            # Temps additionnel pour le retour (5 secondes)
-            if self.temps_depuis_spawn > self.temps_avant_repos + 5 and dist_spawn > 10:
-                self.epuise = True
-                if self.logger:
-                    self.logger.log_event("creature_exhausted", {
-                        "creature_id": self.creature_id,
-                        "creature_type": self.type_creature,
-                        "position": [self.x, self.y],
-                        "distance_from_spawn": dist_spawn
-                    })
-                return
+            return False
+        else:
+            self.x, self.y = self.spawn_x, self.spawn_y
+            return True
 
-            if dist_spawn < 5:
-                self.en_repos = True
-                self.retour_spawn = False
-                self.temps_repos_debut = time.time()
-                self.x = self.spawn_x
-                self.y = self.spawn_y
-                
-                if self.logger:
-                    self.logger.log_event("creature_state_change", {
-                        "creature_id": self.creature_id,
-                        "creature_type": self.type_creature,
-                        "new_state": "en_repos",
-                        "position": [self.x, self.y],
-                        "communications_count": len(self.communications_reçues)
-                    })
-                
-                if self.temps_debut_trajet:
-                    duree_trajet = time.time() - self.temps_debut_trajet
-                    self.temps_trajets.append(duree_trajet)
-                    self.trajets_complets += 1
-                    
-                    if self.logger:
-                        self.logger.log_event("trip_completed", {
-                            "creature_id": self.creature_id,
-                            "creature_type": self.type_creature,
-                            "duration": duree_trajet,
-                            "total_trips": self.trajets_complets,
-                            "communications_during_trip": len(self.communications_reçues)
-                        })
-                return
-            else:
-                self.angle = math.atan2(self.spawn_y - self.y, self.spawn_x - self.x)
-        
-        elif self.en_repos:
-            temps_repos_actuel = time.time() - self.temps_repos_debut
-            if temps_repos_actuel >= self.duree_repos:
-                self.en_repos = False
-                self.temps_depuis_spawn = 0
-                self.temps_debut_trajet = time.time()
-                
-                if self.logger:
-                    self.logger.log_event("creature_state_change", {
-                        "creature_id": self.creature_id,
-                        "creature_type": self.type_creature,
-                        "new_state": "exploration",
-                        "position": [self.x, self.y],
-                        "communications_count": len(self.communications_reçues)
-                    })
-            else:
-                self.x = self.spawn_x
-                self.y = self.spawn_y
-                return
-        
-        else: # Exploration
-            self.temps_changement_direction += 1
-            if self.temps_changement_direction > 60:
-                old_angle = self.angle
-                self.angle += random.uniform(-0.5, 0.5)
-                self.temps_changement_direction = 0
-                
-                if self.logger:
-                    self.logger.log_event("direction_change", {
-                        "creature_id": self.creature_id,
-                        "creature_type": self.type_creature,
-                        "old_angle": old_angle,
-                        "new_angle": self.angle,
-                        "position": [self.x, self.y]
-                    })
-            
-            # Évitement des obstacles pour les Drones de Surface seulement
-            if self.type_creature == "drone_de_surface":
-                for obstacle in obstacles:
-                    if obstacle.rect.collidepoint(self.x, self.y):
-                        angle_evitement = math.atan2(self.y - obstacle.y, self.x - obstacle.x)
-                        self.angle = angle_evitement
-                        
-                        if self.logger:
-                            self.logger.log_event("obstacle_avoidance", {
-                                "creature_id": self.creature_id,
-                                "creature_type": self.type_creature,
-                                "obstacle_position": [obstacle.x, obstacle.y],
-                                "new_angle": self.angle,
-                                "position": [self.x, self.y]
-                            })
-            
-            if self.a_trouve_homme_mer:
-                angle_homme_mer = math.atan2(homme_a_la_mer.y - self.y, homme_a_la_mer.x - self.x)
-                self.angle = angle_homme_mer
-        
+    def explorer(self, obstacles, homme_a_la_mer):
+        self.temps_changement_direction += 1
+        if self.temps_changement_direction > 60:
+            old_angle = self.angle
+            self.angle += random.uniform(-0.5, 0.5)
+            self.temps_changement_direction = 0
+            if self.logger:
+                self.logger.log_event("direction_change", {
+                    "creature_id": self.creature_id,
+                    "old_angle": old_angle,
+                    "new_angle": self.angle,
+                    "position": [self.x, self.y]
+                })
+
+        # Évitement d’obstacles
+        if self.type_creature == "drone_de_surface":
+            for obstacle in obstacles:
+                if obstacle.rect.collidepoint(self.x, self.y):
+                    self.eviter_obstacle(obstacle)
+
+        if self.a_trouve_homme_mer:
+            self.angle = math.atan2(homme_a_la_mer.y - self.y, homme_a_la_mer.x - self.x)
+
+    def eviter_obstacle(self, obstacle):
+        angle_evitement = math.atan2(self.y - obstacle.y, self.x - obstacle.x)
+        self.angle = angle_evitement
+        if self.logger:
+            self.logger.log_event("obstacle_avoidance", {
+                "creature_id": self.creature_id,
+                "creature_type": self.type_creature,
+                "obstacle_position": [obstacle.x, obstacle.y],
+                "new_angle": self.angle,
+                "position": [self.x, self.y]
+            })
+
+    def mettre_a_jour_position(self, obstacles):
         self.vx = math.cos(self.angle) * self.vitesse
         self.vy = math.sin(self.angle) * self.vitesse
-        
         nouvelle_x = self.x + self.vx
         nouvelle_y = self.y + self.vy
-        
-        # Vérifier les limites de l'écran et les obstacles
-        nouvelle_pos_ok = True
-        if not (0 <= nouvelle_x < LARGEUR_SIMULATION and 0 <= nouvelle_y < HAUTEUR_SIMULATION):
-            nouvelle_pos_ok = False
-        else:
-            if self.type_creature == "drone_de_surface":
-                nouvelle_rect = pygame.Rect(nouvelle_x - self.taille, nouvelle_y - self.taille, self.taille * 2, self.taille * 2)
-                for obstacle in obstacles:
-                    if nouvelle_rect.colliderect(obstacle.rect):
-                        nouvelle_pos_ok = False
-                        # Recalculer l'angle d'évitement
-                        angle_evitement = math.atan2(self.y - obstacle.y, self.x - obstacle.x)
-                        self.angle = angle_evitement + random.uniform(-math.pi/4, math.pi/4) # Ajouter une variation
-                        break
-        
+
+        nouvelle_pos_ok = 0 <= nouvelle_x < LARGEUR_SIMULATION and 0 <= nouvelle_y < HAUTEUR_SIMULATION
+
+        if nouvelle_pos_ok and self.type_creature == "drone_de_surface":
+            nouvelle_rect = pygame.Rect(nouvelle_x - self.taille, nouvelle_y - self.taille, self.taille * 2, self.taille * 2)
+            for obstacle in obstacles:
+                if nouvelle_rect.colliderect(obstacle.rect):
+                    self.angle = math.atan2(self.y - obstacle.y, self.x - obstacle.x) + random.uniform(-math.pi/4, math.pi/4)
+                    nouvelle_pos_ok = False
+                    break
+
         if nouvelle_pos_ok:
             if not self.epuise and not self.en_repos:
-                distance = math.sqrt((nouvelle_x - self.x)**2 + (nouvelle_y - self.y)**2)
-                self.distance_parcourue += distance
-            
-            self.x = nouvelle_x
-            self.y = nouvelle_y
+                self.distance_parcourue += math.dist((self.x, self.y), (nouvelle_x, nouvelle_y))
+            self.x, self.y = nouvelle_x, nouvelle_y
         else:
-            if not (0 <= nouvelle_x < LARGEUR_SIMULATION and 0 <= nouvelle_y < HAUTEUR_SIMULATION):
-                self.angle += math.pi
+            self.angle += math.pi
             if self.logger:
                 self.logger.log_event("boundary_hit", {
                     "creature_id": self.creature_id,
@@ -451,48 +451,49 @@ class Drone:
                     "position": [self.x, self.y],
                     "new_angle": self.angle
                 })
-        
-        if not self.epuise and not self.en_repos:
-            dist_homme_mer = math.sqrt((self.x - homme_a_la_mer.x)**2 + (self.y - homme_a_la_mer.y)**2)
-            if dist_homme_mer < self.zone_decouverte and not self.a_trouve_homme_mer:
-                self.a_trouve_homme_mer = True
-                self.couleur = self.couleur_trouve
-                self.temps_premiere_decouverte_homme_mer = time.time()
-                
-                if self.logger:
-                    self.logger.log_event("homme_a_la_mer_discovered", {
-                        "creature_id": self.creature_id,
-                        "creature_type": self.type_creature,
-                        "position": [self.x, self.y],
-                        "homme_a_la_mer_position": [homme_a_la_mer.x, homme_a_la_mer.y],
-                        "distance": dist_homme_mer,
-                        "communications_at_discovery": len(self.communications_reçues)
-                    })
-            
-            rayon_exploration = self.zone_decouverte // 10
-            nouvelles_zones = set()
-            for dx in range(-rayon_exploration, rayon_exploration + 1):
-                for dy in range(-rayon_exploration, rayon_exploration + 1):
-                    if dx*dx + dy*dy <= rayon_exploration*rayon_exploration:
-                        zone_x = int((self.x + dx*10) // 10)
-                        zone_y = int((self.y + dy*10) // 10)
-                        if 0 <= zone_x < LARGEUR_SIMULATION//10 and 0 <= zone_y < HAUTEUR_SIMULATION//10:
-                            zone = (zone_x, zone_y)
-                            if zone not in self.zone_exploree:
-                                nouvelles_zones.add(zone)
-                            self.zone_exploree.add(zone)
-            
-            if nouvelles_zones and self.logger:
-                self.logger.log_event("zones_explored", {
+
+    def detecter_homme_a_la_mer(self, homme_a_la_mer):
+        dist = math.dist((self.x, self.y), (homme_a_la_mer.x, homme_a_la_mer.y))
+        if dist < self.zone_decouverte and not self.a_trouve_homme_mer:
+            self.a_trouve_homme_mer = True
+            self.couleur = self.couleur_trouve
+            self.temps_premiere_decouverte_homme_mer = time.time()
+
+            if self.logger:
+                self.logger.log_event("homme_a_la_mer_discovered", {
                     "creature_id": self.creature_id,
                     "creature_type": self.type_creature,
-                    "new_zones_count": len(nouvelles_zones),
-                    "total_zones": len(self.zone_exploree),
-                    "position": [self.x, self.y]
+                    "position": [self.x, self.y],
+                    "homme_a_la_mer_position": [homme_a_la_mer.x, homme_a_la_mer.y],
+                    "distance": dist,
+                    "communications_at_discovery": len(self.communications_reçues)
                 })
-            
-            self.zones_decouvertes_uniques.update(nouvelles_zones)
-    
+
+    def mettre_a_jour_zones_explorees(self):
+        rayon = self.zone_decouverte // 10
+        nouvelles_zones = set()
+        for dx in range(-rayon, rayon + 1):
+            for dy in range(-rayon, rayon + 1):
+                if dx*dx + dy*dy <= rayon*rayon:
+                    zx, zy = int((self.x + dx*10) // 10), int((self.y + dy*10) // 10)
+                    if 0 <= zx < LARGEUR_SIMULATION//10 and 0 <= zy < HAUTEUR_SIMULATION//10:
+                        zone = (zx, zy)
+                        if zone not in self.zone_exploree:
+                            nouvelles_zones.add(zone)
+                        self.zone_exploree.add(zone)
+
+        if nouvelles_zones and self.logger:
+            self.logger.log_event("zones_explored", {
+                "creature_id": self.creature_id,
+                "creature_type": self.type_creature,
+                "new_zones_count": len(nouvelles_zones),
+                "total_zones": len(self.zone_exploree),
+                "position": [self.x, self.y]
+            })
+
+        self.zones_decouvertes_uniques.update(nouvelles_zones)
+
+
     def dessiner(self, ecran_simulation, afficher_cercles_communication, brouillages):
         if self.epuise:
             taille_croix = 6
@@ -1049,7 +1050,7 @@ class Simulation:
         if en_pause:
             font = pygame.font.Font(None, 72)
             text = font.render("PAUSE", True, ROUGE)
-            ecran.blit(text, (LARGEUR_SIMULATION // 2 - 80, HAUTEUR // 2 - 36))
+        x
 
 def main():
     global en_pause, afficher_cercles_communication
@@ -1059,7 +1060,8 @@ def main():
     
     nb_drones_surface = 5
     nb_drones_aerien = 5
-    spawn_x, spawn_y = 100, 100
+    spawn_x = random.randint(0, LARGEUR_SIMULATION)
+    spawn_y = random.randint(0, HAUTEUR_SIMULATION)
     pourcentage_zone_brouillee = 10 
     
     logger = Logger()

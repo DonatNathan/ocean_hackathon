@@ -166,6 +166,10 @@ class Drone:
 
         self.zone_exploree.update(autre_creature.zone_exploree)
         autre_creature.zone_exploree.update(self.zone_exploree)
+        if not self.retour_spawn and  self.target:
+            zone = (self.target[0], self.target[1])
+            autre_creature.zone_exploree.update(zone)
+
 
         self.zones_decouvertes_uniques.update(nouvelles_zones_recues)
         autre_creature.zones_decouvertes_uniques.update(nouvelles_zones_envoyees)
@@ -359,7 +363,6 @@ class Drone:
                 self.angle = math.atan2(self.target[1] - self.y, self.target[0] - self.x)
             else:
                 self.angle += random.uniform(-0.3, 0.3)
-
         if self.type_creature == "drone_de_surface" and self.target is not None:
             if self.contournement_actif:
                 self.frames_contournement -= 1

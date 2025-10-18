@@ -48,7 +48,7 @@ class Drone:
         
         # Caractéristiques selon le type
         if type_creature == "drone_de_surface":
-            self.vitesse = constant.FACTEUR_ACCELERATION * 13.8 / constant.FPS
+            self.vitesse = constant.FACTEUR_ACCELERATION * 138 / constant.FPS
             self.couleur = constant.ROUGE
             self.couleur_trouve = constant.ROUGE_CLAIR
             self.taille = 3
@@ -57,7 +57,7 @@ class Drone:
             self.duree_repos = 20
             self.rayon_communication = 50
         elif type_creature == "drone_aerien":
-            self.vitesse = constant.FACTEUR_ACCELERATION * 27.7 / constant.FPS
+            self.vitesse = constant.FACTEUR_ACCELERATION * 277 / constant.FPS
             self.couleur = constant.BLEU
             self.couleur_trouve = constant.BLEU_CLAIR
             self.taille = 4
@@ -65,7 +65,16 @@ class Drone:
             self.temps_avant_repos = 80
             self.duree_repos = 15
             self.rayon_communication = 80
-        
+        elif type_creature == "base":
+            self.vitesse = 0
+            self.couleur = constant.VERT
+            self.couleur_trouve = constant.VERT
+            self.taille = 6
+            self.zone_decouverte = 0
+            self.temps_avant_repos = float('inf')
+            self.duree_repos = 0
+            self.rayon_communication = 100
+
         # Log de création
         if self.logger:
             self.logger.log_event("creature_created", {
@@ -103,12 +112,13 @@ class Drone:
                     "reason": "brouillage"
                 })
             return False
-
+        if self.type_creature == "base" or autre_creature.type_creature == "base":
+            print("Communication avec la base détectée.")
         current_time = time.time()
-        if autre_creature.creature_id in self.derniere_communication:
-            temps_derniere = self.derniere_communication[autre_creature.creature_id]
-            if current_time - temps_derniere < self.cooldown_communication:
-                return False
+        # if autre_creature.creature_id in self.derniere_communication:
+        #     temps_derniere = self.derniere_communication[autre_creature.creature_id]
+        #     if current_time - temps_derniere < self.cooldown_communication:
+        #         return False
 
         self.communications_reçues.add(autre_creature.creature_id)
         autre_creature.communications_reçues.add(self.creature_id)
@@ -148,7 +158,8 @@ class Drone:
                     "creature_2_contacts": len(autre_creature.communications_reçues)
                 }
             })
-
+        if (self.type_creature =="base"):
+            print("Base a communiqué avec la créature ID:", autre_creature.creature_id)
         nouvelles_zones_recues = autre_creature.zone_exploree - self.zone_exploree
         nouvelles_zones_envoyees = self.zone_exploree - autre_creature.zone_exploree
 
@@ -292,29 +303,44 @@ class Drone:
         #             "position": [self.x, self.y]
         #         })
 
-        print("ID Drone: ", self.creature_id)
-        print("Communication: ", len(self.zones_decouvertes_uniques))
-
+        print("Zone: ", len(self.zones_decouvertes_uniques))
         if self.a_trouve_homme_mer:
             self.angle = math.atan2(homme_a_la_mer.y - self.y, homme_a_la_mer.x - self.x)
             return
 
         cell_size = 10
         max_range = 200
+        rayon_detection_cell = self.zone_decouverte // cell_size  # rayon en cellules
         cx, cy = int(self.x // cell_size), int(self.y // cell_size)
 
         target = None
         best_dist = float("inf")
-        for dx in range(-int(max_range / cell_size), int(max_range / cell_size)):
-            for dy in range(-int(max_range / cell_size), int(max_range / cell_size)):
+
+        # Parcours des zones dans un rayon max_range
+        for dx in range(-int(max_range / cell_size), int(max_range / cell_size) + 1):
+            for dy in range(-int(max_range / cell_size), int(max_range / cell_size) + 1):
                 tx, ty = cx + dx, cy + dy
-                if 0 <= tx < constant.LARGEUR_SIMULATION // 10 and 0 <= ty < constant.HAUTEUR_SIMULATION // 10:
-                    zone = (tx, ty)
-                    if zone not in self.zones_decouvertes_uniques:
-                        dist = math.hypot(dx, dy)
-                        if dist < best_dist:
-                            best_dist = dist
-                            target = (tx * cell_size, ty * cell_size)
+                
+                # Vérifier les limites
+                if not (0 <= tx < constant.LARGEUR_SIMULATION // cell_size and 
+                        0 <= ty < constant.HAUTEUR_SIMULATION // cell_size):
+                    continue
+
+                zone = (tx, ty)
+
+                # Ignorer si déjà explorée
+                if zone in self.zones_decouvertes_uniques:
+                    continue
+
+                # Ignorer si déjà détectable depuis la position actuelle
+                if dx*dx + dy*dy <= rayon_detection_cell * rayon_detection_cell:
+                    continue  # Pas besoin d'y aller : on la "voit" déjà
+
+                # Sinon, c'est une zone non couverte → considérer comme cible potentielle
+                dist = math.hypot(dx, dy)
+                if dist < best_dist:
+                    best_dist = dist
+                    target = (tx * cell_size + cell_size // 2, ty * cell_size + cell_size // 2)  # centre de la cellule
 
         if target:
             self.angle = math.atan2(target[1] - self.y, target[0] - self.x)

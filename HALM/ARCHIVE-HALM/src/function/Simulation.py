@@ -225,9 +225,10 @@ class Simulation:
 
     def generer_monde(self):
 
+
+        threading.Timer( 0, self.spawn_drone, args=("base",)).start()
         for i in range(self.nb_drones_surface):
             threading.Timer(i, self.spawn_drone, args=("drone_de_surface",)).start()
-
         offset = self.nb_drones_surface * 0.5
         for i in range(self.nb_drones_aerien):
             threading.Timer(offset + 0.5 * i, self.spawn_drone, args=("drone_aerien",)).start()
@@ -342,7 +343,6 @@ class Simulation:
             
         for creature in self.creatures:
             creature.deplacer(self.obstacles, self.homme_a_la_mer, self.creatures, self.brouillages, self)
-            
             if creature.a_trouve_homme_mer and not self.homme_a_la_mer_decouvert:
                 self.homme_a_la_mer_decouvert = True
                 self.homme_a_la_mer.decouvert = True
@@ -448,13 +448,17 @@ class Simulation:
         y_stats += 20
         communications_reussies = self.comms_surface_surface + self.comms_surface_aerien + self.comms_aerien_aerien
         communications_echouees = sum(c.communications_echouees for c in self.creatures)
+        elapsed_time = (self.temps_fin or time.time()) - self.temps_debut
         text = font_info.render(f"Communications réussies: {communications_reussies}", True, constant.VIOLET)
         ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_stats))
         y_stats += 20
         text = font_info.render(f"Communications échouées: {communications_echouees}", True, constant.VIOLET)
         ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_stats))
         y_stats += 30
-        
+        text = font_info.render(f"Durée depuis le début: {elapsed_time}", True, constant.VIOLET)
+        ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_stats))
+        y_stats += 30
+
         if self.homme_a_la_mer_decouvert:
             text = font_info.render("HOMME À LA MER DÉCOUVERT !", True, constant.VERT)
             ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_stats))

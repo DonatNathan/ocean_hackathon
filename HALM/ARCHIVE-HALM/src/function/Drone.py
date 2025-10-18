@@ -58,7 +58,7 @@ class Drone:
             self.couleur_trouve = constant.ROUGE_CLAIR
             self.taille = 3
             self.zone_decouverte = 15
-            self.temps_avant_repos = 8
+            self.temps_avant_repos = 24
             self.duree_repos = 2
             self.rayon_communication = 50
         elif type_creature == "drone_aerien":
@@ -67,7 +67,7 @@ class Drone:
             self.couleur_trouve = constant.BLEU_CLAIR
             self.taille = 4
             self.zone_decouverte = 30
-            self.temps_avant_repos = 4
+            self.temps_avant_repos = 10
             self.duree_repos = 1.5
             self.rayon_communication = 80
         elif type_creature == "base":
@@ -161,8 +161,6 @@ class Drone:
                     "creature_2_contacts": len(autre_creature.communications_reçues)
                 }
             })
-        if (self.type_creature =="base"):
-            print("Base a communiqué avec la créature ID:", autre_creature.creature_id)
         nouvelles_zones_recues = autre_creature.zone_exploree - self.zone_exploree
         nouvelles_zones_envoyees = self.zone_exploree - autre_creature.zone_exploree
 
@@ -175,7 +173,7 @@ class Drone:
     
     def verifier_communications(self, autres_creatures, brouillages, simulation):
         """Vérifie les communications et met à jour self.link (liste d'objets)"""
-        self.link = []  # liste de références vers les créatures connectées
+        self.link = []
         communications_etablies = 0
 
         for autre in autres_creatures:
@@ -187,42 +185,40 @@ class Drone:
 
             if distance <= portee:
                 if self.communiquer_avec(autre, brouillages, simulation):
-                    self.link.append(autre)  # on garde la référence
+                    self.link.append(autre)
                     communications_etablies += 1
 
         return communications_etablies
-            
+    
     def deplacer(self, obstacles, homme_a_la_mer, autres_creatures, brouillages, simulation):
         self.target = None
         if self.epuise:
-            print("[LOG] Créature épuisée, ne se déplace pas.")
             return
 
         self.temps_depuis_spawn += 1 / constant.FPS
 
         if not self.en_repos:
-            print("[LOG] Vérification des communications.")
             self.verifier_communications(autres_creatures, brouillages, simulation)
 
+        dist_spawn = math.sqrt((self.x - self.spawn_x)**2 + (self.y - self.spawn_y)**2)
+        if self.temps_depuis_spawn > self.temps_avant_repos and dist_spawn > 10:
+                self.epuise = True
         if self.retour_spawn:
-            print("[LOG] Mode retour vers spawn.")
             if self.gerer_retour_spawn():
-                print("[LOG] Retour spawn terminé, arrêt déplacement.")
+                print(f"[LOG] Drone {self.creature_id} retourne au spawn.")
                 return
 
         elif self.en_repos:
-            print("[LOG] Mode repos.")
             if self.gerer_repos():
-                print("[LOG] Fin de repos, arrêt déplacement.")
+                print(f"[LOG] Drone {self.creature_id} reste en repos.")
                 return
+            else:
+                print(f"[LOG] Drone {self.creature_id} sort du repos.")
 
-        else:
-            print("[LOG] Mode exploration.")
-            self.explorer(obstacles, homme_a_la_mer)
+        self.explorer(obstacles, homme_a_la_mer)
 
-        if not self.en_repos and not self.retour_spawn:
-            print("[LOG] Demi-temps atteint, passage en retour vers spawn.")
-            self.passer_en_retour_spawn()
+        if not self.en_repos and not self.retour_spawn and self.temps_depuis_spawn >= self.temps_avant_repos / 2:
+            self.retour_spawn = True
 
         self.mettre_a_jour_zones_explorees()
         self.mettre_a_jour_position(obstacles)
@@ -230,19 +226,20 @@ class Drone:
 
     def passer_en_retour_spawn(self):
         if  self.target is None:
-            print("[LOG]  Pas de cible, rien à faire.")
             return
-        distance_vers_cible = math.hypot(self.target[0] - self.x, self.target[1] - self.y)
         if self.vitesse == 0:
-            print("[LOG] Vitesse nulle, ne peut pas calculer le temps nécessaire.")
             return
+        distance_vers_cible = math.dist((self.x, self.y), (self.target[0], self.target[1]))
         temps_necessaire = distance_vers_cible / self.vitesse
-        if temps_necessaire > self.temps_avant_repos * constant.FPS:
-            print("[LOG] Retour vers spawn initié.", temps_necessaire, self.temps_avant_repos* constant.FPS)
+        print("----------------------------------------------------------------")
+        print(temps_necessaire)
+        print(self.temps_avant_repos - self.temps_depuis_spawn)
+        print("----------------------------------------------------------------")
+        if temps_necessaire >= self.temps_avant_repos - self.temps_depuis_spawn:
             self.retour_spawn = True
+            print(f"[LOG] Drone {self.creature_id} passe en mode retour au spawn.")
             self.target = (self.spawn_x, self.spawn_y)
         else:
-            print("[LOG] Temps nécessaire pour atteindre la cible est inférieur au temps avant repos, pas de retour vers spawn.")
             return
 
         if self.logger:
@@ -256,8 +253,7 @@ class Drone:
 
     def gerer_retour_spawn(self):
         dist_spawn = math.dist((self.x, self.y), (self.spawn_x, self.spawn_y))
-
-        if dist_spawn < 5 and self.retour_spawn:
+        if dist_spawn < 5:
             self.entrer_en_repos()
             return True
         else:
@@ -294,8 +290,10 @@ class Drone:
 
     def gerer_repos(self):
         temps_repos_actuel = time.time() - self.temps_repos_debut
+        print(f"[LOG] Drone {self.creature_id} en repos depuis {temps_repos_actuel:.2f}s., durée requise: {self.duree_repos}s.")
         if temps_repos_actuel >= self.duree_repos:
             self.en_repos = False
+            self.retour_spawn = False
             self.temps_depuis_spawn = 0
             self.temps_debut_trajet = time.time()
 
@@ -309,39 +307,59 @@ class Drone:
                 })
             return False
         else:
-            self.x, self.y = self.spawn_x, self.spawn_y
             return True
 
+    def zone_contient_obstacle(self, tx, ty, obstacles):
+        """Renvoie True si un obstacle occupe (même partiellement) la zone (tx, ty)."""
+        zone_rect = pygame.Rect(tx * 10, ty * 10, 10, 10)
+        for obstacle in obstacles:
+            if obstacle.rect.colliderect(zone_rect):
+                return True
+        return False
+    
     def explorer(self, obstacles, homme_a_la_mer):
-
-        print("Zone: ", len(self.zones_decouvertes_uniques))
         if self.a_trouve_homme_mer:
             self.angle = math.atan2(homme_a_la_mer.y - self.y, homme_a_la_mer.x - self.x)
             return
 
-        rayon = self.zone_decouverte // 10
-
         cell_size = 10
         max_range = 200
-        cx, cy = int(self.x // cell_size), int(self.y // cell_size)
+        R = max_range // cell_size
+
+        cx = int(self.x // cell_size)
+        cy = int(self.y // cell_size)
 
         self.target = None
         best_dist = float("inf")
-        for dx in range(-int(max_range / cell_size), int(max_range / cell_size)):
-            for dy in range(-int(max_range / cell_size), int(max_range / cell_size)):
-                tx, ty = cx + dx, cy + dy
-                if 0 <= tx < constant.LARGEUR_SIMULATION // 10 and 0 <= ty < constant.HAUTEUR_SIMULATION // 10:
-                    zone = (tx, ty)
-                    if zone not in self.zones_decouvertes_uniques:
-                        dist = math.hypot(dx, dy)
-                        if dist < best_dist:
-                            best_dist = dist
-                            self.target = (tx * cell_size, ty * cell_size)
+        best_targets = []
+        directions = [(dx, dy) for dx in range(-R, R) for dy in range(-R, R)]
+        random.shuffle(directions)
+        for dx, dy in directions:
+            tx, ty = cx + dx, cy + dy
+            if not (0 <= tx < constant.LARGEUR_SIMULATION // cell_size and 0 <= ty < constant.HAUTEUR_SIMULATION // cell_size):
+                continue
+            zone = (tx, ty)
+            if zone in self.zones_decouvertes_uniques:
+                continue
+            if self.zone_contient_obstacle(tx, ty, obstacles):
+                self.zones_decouvertes_uniques.add(zone)
+                continue
+            target_x = tx * cell_size + cell_size / 2
+            target_y = ty * cell_size + cell_size / 2
+            dist = math.hypot(target_x - self.x, target_y - self.y)
+            if dist < best_dist - 1e-6:
+                best_dist = dist
+                best_targets = [(target_x, target_y)]
+            elif abs(dist - best_dist) <= 1e-6:
+                best_targets.append((target_x, target_y))
+        if best_targets:
+            self.target = random.choice(best_targets)
+        if not self.en_repos and not self.retour_spawn:
+            if self.target is not None:
+                self.angle = math.atan2(self.target[1] - self.y, self.target[0] - self.x)
+            else:
+                self.angle += random.uniform(-0.3, 0.3)
 
-        if self.target:
-            self.angle = math.atan2(self.target[1] - self.y, self.target[0] - self.x)
-        else:
-            self.angle += random.uniform(-0.3, 0.3)
         if self.type_creature == "drone_de_surface" and self.target is not None:
             if self.contournement_actif:
                 self.frames_contournement -= 1
@@ -353,40 +371,65 @@ class Drone:
                 distance_vers_cible = math.hypot(dx, dy)
 
                 if distance_vers_cible > 0:
-                    dir_x = dx / distance_vers_cible
-                    dir_y = dy / distance_vers_cible
-                    self.distance_detection = min(100.0, distance_vers_cible)
-                    future_x = self.x + dir_x * self.distance_detection
-                    future_y = self.y + dir_y * self.distance_detection
-
+                    pas = max(1, int(distance_vers_cible / 0.1))
                     obstacle_trouve = None
-                    for obstacle in obstacles:
-                        if obstacle.rect.collidepoint(future_x, future_y):
-                            obstacle_trouve = obstacle
+                    for i in range(1, pas + 1):
+                        t = i / pas
+                        check_x = self.x + dx * t
+                        check_y = self.y + dy * t
+                        for obstacle in obstacles:
+                            if obstacle.rect.collidepoint(check_x, check_y):
+                                obstacle_trouve = obstacle
+                                break
+                        if obstacle_trouve:
                             break
 
                     if obstacle_trouve:
-                        print("[LOG] Obstacle détecté activation du contournement.")
-                        self.demarrer_contournement(obstacle_trouve)
+                        self.demarrer_contournement(obstacle_trouve, obstacles)
 
-    def demarrer_contournement(self, obstacle):
-        """Démarre un contournement déterministe (toujours à droite) pendant N frames."""
+    def demarrer_contournement(self, obstacle, obstacles_liste):
+        """
+        Contourne en choisissant le côté (gauche/droite) avec le plus d'espace.
+        """
         dx = self.x - obstacle.x
         dy = self.y - obstacle.y
-        distance = math.hypot(dx, dy)
+        direction = math.atan2(dy, dx)
+        angle_gauche = direction + math.pi / 2
+        angle_droite = direction - math.pi / 2 
 
-        if distance == 0:
-            direction = 0.0
+        test_dist = 1
+        point_gauche = (
+            self.x + math.cos(angle_gauche) * test_dist,
+            self.y + math.sin(angle_gauche) * test_dist
+        )
+        point_droite = (
+            self.x + math.cos(angle_droite) * test_dist,
+            self.y + math.sin(angle_droite) * test_dist
+        )
+
+        def point_dans_obstacle(px, py, liste_obs):
+            for obs in liste_obs:
+                if obs.rect.collidepoint(px, py):
+                    return True
+            return False
+
+        gauche_libre = not point_dans_obstacle(point_gauche[0], point_gauche[1], obstacles_liste)
+        droite_libre = not point_dans_obstacle(point_droite[0], point_droite[1], obstacles_liste)
+
+        if gauche_libre and droite_libre:
+            if hasattr(self, 'creature_id') and self.creature_id % 2 == 0:
+                self.angle = angle_droite
+            else:
+                self.angle = angle_gauche
+        elif gauche_libre:
+            self.angle = angle_gauche
+        elif droite_libre:
+            self.angle = angle_droite
         else:
-            direction = math.atan2(dy, dx)
-
-        # Toujours à droite
-        self.angle = direction - math.pi / 2
+            self.angle = angle_droite
         self.angle = (self.angle + math.pi) % (2 * math.pi) - math.pi
-
-        # Activer le mode contournement pendant 20 frames (ajuste selon la taille des obstacles)
         self.contournement_actif = True
-        self.frames_contournement = 5
+        self.frames_contournement = 25
 
     def mettre_a_jour_position(self, obstacles):
         self.vx = math.cos(self.angle) * self.vitesse

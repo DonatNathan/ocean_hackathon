@@ -225,14 +225,14 @@ class Simulation:
             angle = (2 * math.pi / self.nb_drones_surface) * i
             vx = math.cos(angle)
             vy = math.sin(angle)
-            threading.Timer(0.5 * i, self.spawn_drone, args=("drone_de_surface", vx, vy)).start()
+            threading.Timer(0 * i, self.spawn_drone, args=("drone_de_surface", vx, vy)).start()
 
         offset = self.nb_drones_surface * 0.5
         for i in range(self.nb_drones_aerien):
             angle = (2 * math.pi / self.nb_drones_aerien) * i
             vx = math.cos(angle)
             vy = math.sin(angle)
-            threading.Timer(offset + 0.5 * i, self.spawn_drone, args=("drone_aerien", vx, vy)).start()
+            threading.Timer(0 * i, self.spawn_drone, args=("drone_aerien", vx, vy)).start()
 
     def spawn_drone(self, drone_type, vx, vy):
         creature_id = self.get_next_creature_id()

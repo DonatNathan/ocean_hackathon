@@ -28,8 +28,8 @@ class Boat:
         self.y = random.randint(100, constant.HAUTEUR_SIMULATION - 100)
 
         self.speed = speed
-        self.sizeX = 40
-        self.sizeY = 20
+        self.sizeX = 100
+        self.sizeY = 30
         self.color = constant.NOIR
 
         # "Man overboard" control
@@ -126,22 +126,8 @@ class Boat:
                 drone.x = self.x + rotated_x
                 drone.y = self.y + rotated_y
 
-        # --- Handle out-of-bounds and respawn ---
-        if (
-            self.x < -self.sizeX
-            or self.x > constant.LARGEUR_SIMULATION + self.sizeX
-            or self.y < -self.sizeY
-            or self.y > constant.HAUTEUR_SIMULATION + self.sizeY
-        ):
-            self.respawn()
-
-
     # ------------------------------------------------------------ #
-    def respawn(self):
-        """Reset boat to the opposite side with a new random direction and Y."""
-        self.__init__(speed=self.speed)
 
-    # ------------------------------------------------------------ #
     def create_man_overboard(self):
         """Randomly create a man overboard once per journey."""
         if not self.has_dropped_man:
@@ -152,7 +138,6 @@ class Boat:
             drop_y = self.y - self.direction_vector[1] * drop_distance
             self.man_overboard_pos = (drop_x, drop_y)
             print(f"[EVENT] Man overboard at {self.man_overboard_pos}")
-            self.send_drones()
             return self.man_overboard_pos
         return None
 

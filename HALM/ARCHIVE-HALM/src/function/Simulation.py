@@ -244,7 +244,10 @@ class Simulation:
             rect = pygame.Rect(boat.x - boat.sizeX/2, boat.y - boat.sizeY/2, boat.sizeX, boat.sizeY)
             if rect.collidepoint(x, y):
                 print(f"✅ Clicked on boat at ({boat.x:.1f}, {boat.y:.1f})")
-                boat.create_man_overboard()
+                if boat.has_dropped_man:
+                    boat.send_drones()
+                else:
+                    boat.create_man_overboard()
                 return boat
         return None
 

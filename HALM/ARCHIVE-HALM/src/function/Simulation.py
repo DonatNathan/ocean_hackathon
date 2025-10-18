@@ -436,7 +436,9 @@ class Simulation:
         text = font_info.render(f"Drones Aériens: {drones_aerien_actifs} (épuisés: {drones_aerien_epuises})", True, constant.BLEU)
         ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_stats))
         y_stats += 20
-        text = font_info.render(f"Zones explorées: {len(self.zones_explorees)}", True, constant.NOIR)
+        total_zones = (constant.LARGEUR_SIMULATION // 10) * (constant.HAUTEUR_SIMULATION // 10)
+        pourcentage = (len(self.zones_explorees) / total_zones) * 100
+        text = font_info.render(f"Zones explorées: {pourcentage:.1f}%", True, constant.NOIR)
         ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_stats))
         y_stats += 20
         communications_reussies = self.comms_surface_surface + self.comms_surface_aerien + self.comms_aerien_aerien

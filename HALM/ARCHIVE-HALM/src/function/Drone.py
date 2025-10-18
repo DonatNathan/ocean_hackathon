@@ -207,7 +207,6 @@ class Drone:
         self.detecter_homme_a_la_mer(homme_a_la_mer)
         self.mettre_a_jour_zones_explorees()
 
-
     def passer_en_retour_spawn(self):
         self.retour_spawn = True
         if self.logger:
@@ -397,11 +396,10 @@ class Drone:
             if afficher_cercles_communication and not self.est_dans_zone_brouillage(brouillages):
                 surface_communication = pygame.Surface((self.rayon_communication * 2, self.rayon_communication * 2), pygame.SRCALPHA)
                 pygame.draw.circle(surface_communication, (*constant.CYAN, 30), (self.rayon_communication, self.rayon_communication), self.rayon_communication)
-                ecran_simulation.blit(surface_communication, (self.x - self.rayon_communication, self.y - self.rayon_communication))
-            
+                ecran_simulation.blit(surface_communication, (self.x - self.rayon_communication, self.y - self.rayon_communication))          
             if self.a_trouve_homme_mer:
                 pygame.draw.circle(ecran_simulation, (*self.couleur_trouve, 50), (int(self.x), int(self.y)), self.zone_decouverte, 2)
-            
+
             if self.type_creature == "drone_aerien":
                 points = [
                     (self.x, self.y - self.taille),
@@ -411,16 +409,16 @@ class Drone:
                 pygame.draw.polygon(ecran_simulation, self.couleur, points)
             else:
                 pygame.draw.circle(ecran_simulation, self.couleur, (int(self.x), int(self.y)), self.taille)
-            
+
             font_id = pygame.font.Font(None, 16)
             text_id = font_id.render(str(self.creature_id), True, constant.NOIR)
             ecran_simulation.blit(text_id, (self.x - 5, self.y - 15))
-            
+
             if self.en_repos:
                 pygame.draw.circle(ecran_simulation, constant.VERT, (int(self.x), int(self.y - 10)), 2)
             elif self.retour_spawn:
                 pygame.draw.circle(ecran_simulation, constant.ORANGE, (int(self.x), int(self.y - 10)), 2)
-            
+
             if len(self.communications_reçues) > 0:
                 font_com = pygame.font.Font(None, 14)
                 text_com = font_com.render(f"C:{len(self.communications_reçues)}", True, constant.VIOLET)

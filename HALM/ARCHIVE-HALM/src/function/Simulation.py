@@ -14,9 +14,10 @@ from .Drone import Drone
 from .Obstacle import Obstacle
 from .Brouillage import Brouillage
 from .HommeALaMer import HommeALaMer
+from .Boat import Boat
 
 class Simulation:
-    def __init__(self, nb_drones_surface=8, nb_drones_aerien=7, spawn_x=100, spawn_y=100, logger=None, pourcentage_brouillage=10):
+    def __init__(self, nb_drones_surface=8, nb_drones_aerien=7, spawn_x=100, spawn_y=100, logger=None, pourcentage_brouillage=10, mode="classic"):
         self.nb_drones_surface = nb_drones_surface
         self.nb_drones_aerien = nb_drones_aerien
         self.spawn_x = spawn_x
@@ -38,13 +39,15 @@ class Simulation:
         self.premiere_decouverte_homme_mer = None
         self.qui_a_trouve_homme_mer = None
         self.pause_automatique = False
+        self.boats = []
+        self.mode = mode
         
         # Nouveaux compteurs de communication
         self.comms_surface_surface = 0
         self.comms_surface_aerien = 0
         self.comms_aerien_aerien = 0
         
-        self.generer_monde()
+        self.generer_monde(mode)
         
         if self.logger:
             self.logger.log_event("simulation_started", {
@@ -99,7 +102,7 @@ class Simulation:
                 "nombre_drones_surface": self.nb_drones_surface,
                 "nombre_drones_aerien": self.nb_drones_aerien,
                 "spawn_position": [self.spawn_x, self.spawn_y],
-                "homme_a_la_mer_position": [self.homme_a_la_mer.x, self.homme_a_la_mer.y],
+                "homme_a_la_mer_position": [self.homme_a_la_mer.x if self.homme_a_la_mer else None, self.homme_a_la_mer.y if self.homme_a_la_mer else None],
                 "nombre_obstacles": len(self.obstacles),
                 "nombre_brouillages": len(self.brouillages),
                 "pourcentage_brouillage_cible": self.pourcentage_brouillage,
@@ -234,13 +237,28 @@ class Simulation:
             vy = math.sin(angle)
             threading.Timer(0 * i, self.spawn_drone, args=("drone_aerien", vx, vy)).start()
 
+    def handleClick(self, x, y):
+        print("In handle click", x, " ", y)
+        for boat in self.boats:
+            print("Boat: ", boat.x, boat.y)
+            rect = pygame.Rect(boat.x - boat.sizeX/2, boat.y - boat.sizeY/2, boat.sizeX, boat.sizeY)
+            if rect.collidepoint(x, y):
+                print(f"✅ Clicked on boat at ({boat.x:.1f}, {boat.y:.1f})")
+                boat.create_man_overboard()
+                return boat
+        return None
+
     def spawn_drone(self, drone_type, vx, vy):
         creature_id = self.get_next_creature_id()
         self.creatures.append(Drone(self.spawn_x, self.spawn_y, self.spawn_x, self.spawn_y, vx, vy, drone_type, self.logger, creature_id))
 
-    def generer_monde(self):
+    def spawn_boat(self):
+        self.boats.append(Boat(speed=3))
 
-        self.spawn_all_drones()
+    def generer_monde(self, mode):
+
+        if (mode == "classic"):
+            self.spawn_all_drones()
         
         for i in range(15):
             x = random.randint(0, constant.LARGEUR_SIMULATION - 100)
@@ -287,9 +305,10 @@ class Simulation:
             if not collision:
                 break
         
-        self.homme_a_la_mer = HommeALaMer(homme_a_la_mer_x, homme_a_la_mer_y)
+        if (mode == "classic"):
+            self.homme_a_la_mer = HommeALaMer(homme_a_la_mer_x, homme_a_la_mer_y)
         
-        if self.logger:
+        if self.logger and self.homme_a_la_mer:
             self.logger.log_event("world_generated", {
                 "obstacles": [[o.x, o.y, o.largeur, o.hauteur] for o in self.obstacles],
                 "brouillages": [[o.x, o.y, o.largeur, o.hauteur] for o in self.brouillages],
@@ -338,6 +357,10 @@ class Simulation:
         return False
     
     def mettre_a_jour(self):
+
+        for boat in self.boats:
+            boat.move()
+
         if not self.homme_a_la_mer_decouvert and all(c.epuise for c in self.creatures):
             if not self.pause_automatique:
                 self.temps_fin = time.time()
@@ -419,18 +442,23 @@ class Simulation:
         for brouillage in self.brouillages:
             brouillage.dessiner(ecran_simulation)
         
-        self.homme_a_la_mer.dessiner(ecran_simulation)
+        if self.homme_a_la_mer:
+            self.homme_a_la_mer.dessiner(ecran_simulation)
+
+        for boat in self.boats:
+            # print("Boat displayed")
+            boat.display(ecran_simulation)
         
         for creature in self.creatures:
             creature.dessiner(ecran_simulation, afficher_cercles_communication, self.brouillages)
         
-        if not self.simulation_reussie and all(c.epuise for c in self.creatures):
+        if not self.simulation_reussie and all(c.epuise for c in self.creatures) and self.mode == "classic":
             font = pygame.font.Font(None, 40)
             text = font.render("SIMULATION ÉCHOUÉE (Tous les drones sont épuisés) !", True, constant.ROUGE)
             ecran_simulation.blit(text, (constant.LARGEUR_SIMULATION // 2 - text.get_width() // 2, constant.HAUTEUR_SIMULATION // 2))
 
         ecran.blit(ecran_simulation, (0, constant.HAUTEUR_ENTETE))
-        
+
         self.afficher_info(ecran)
     
     def afficher_info(self, ecran):

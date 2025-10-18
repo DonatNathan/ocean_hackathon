@@ -19,14 +19,15 @@ def main():
     pygame.display.set_caption("Simulation de Drones - Recherche de l'Homme à la mer")
     horloge = pygame.time.Clock()
     
-    nb_drones_surface = 5
-    nb_drones_aerien = 5
+    nb_drones_surface = 0
+    nb_drones_aerien = 10
     spawn_x = constant.LARGEUR_SIMULATION/2
     spawn_y = constant.HAUTEUR_SIMULATION/2
     pourcentage_zone_brouillee = 10 
+    mode = sys.argv[1] if len(sys.argv) > 1 else "classic"
     
     logger = Logger()
-    simulation = Simulation(nb_drones_surface, nb_drones_aerien, spawn_x, spawn_y, logger, pourcentage_zone_brouillee)
+    simulation = Simulation(nb_drones_surface, nb_drones_aerien, spawn_x, spawn_y, logger, pourcentage_zone_brouillee, mode)
     afficher_cercles_communication = True
     
     while True:
@@ -37,18 +38,15 @@ def main():
                 simulation.sauvegarder_statistiques()
                 pygame.quit()
                 sys.exit()
-            
+
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
-                    if event.pos[0] < constant.LARGEUR_SIMULATION and event.pos[1] > constant.HAUTEUR_ENTETE:
-                        spawn_x, spawn_y = event.pos[0], event.pos[1] - constant.HAUTEUR_ENTETE
-                        simulation.changer_spawn(spawn_x, spawn_y)
+                simulation.handleClick(event.pos[0], event.pos[1] - constant.HAUTEUR_ENTETE)
             
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     logger = Logger()
                     simulation = Simulation(nb_drones_surface, nb_drones_aerien, spawn_x, spawn_y, logger, pourcentage_zone_brouillee)
-                
+
                 elif event.key == pygame.K_1:
                     if simulation.nb_drones_surface < 30:
                         nb_drones_surface += 1
@@ -88,6 +86,9 @@ def main():
                                 logger.log_event("creature_removed", {
                                     "type": "drone_aerien", "total_count": nb_drones_aerien
                                 })
+
+                elif event.key == pygame.K_b:
+                    simulation.spawn_boat()
                 
                 elif event.key == pygame.K_SPACE:
                     constant.en_pause = not constant.en_pause
@@ -107,8 +108,10 @@ def main():
                     fichier_log = logger.save_logs()
                     if fichier_log:
                         print(f"Logs sauvegardés: {fichier_log}")
-        
+
         if not constant.en_pause and not simulation.pause_automatique:
+            simulation.mettre_a_jour()
+        elif mode == "boat":
             simulation.mettre_a_jour()
         
         simulation.dessiner(ecran, afficher_cercles_communication)

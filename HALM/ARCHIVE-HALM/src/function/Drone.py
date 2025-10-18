@@ -205,9 +205,9 @@ class Drone:
             print("[LOG] Mode exploration.")
             self.explorer(obstacles, homme_a_la_mer)
 
+        self.mettre_a_jour_zones_explorees()
         self.mettre_a_jour_position(obstacles)
         self.detecter_homme_a_la_mer(homme_a_la_mer)
-        self.mettre_a_jour_zones_explorees()
 
     def passer_en_retour_spawn(self):
         self.retour_spawn = True
@@ -279,27 +279,50 @@ class Drone:
             return True
 
     def explorer(self, obstacles, homme_a_la_mer):
-        self.temps_changement_direction += 1
-        if self.temps_changement_direction > 60:
-            old_angle = self.angle
-            self.angle += random.uniform(-0.5, 0.5)
-            self.temps_changement_direction = 0
-            if self.logger:
-                self.logger.log_event("direction_change", {
-                    "creature_id": self.creature_id,
-                    "old_angle": old_angle,
-                    "new_angle": self.angle,
-                    "position": [self.x, self.y]
-                })
+        # self.temps_changement_direction += 1
+        # if self.temps_changement_direction > 60:
+        #     old_angle = self.angle
+        #     self.angle += random.uniform(-0.5, 0.5)
+        #     self.temps_changement_direction = 0
+        #     if self.logger:
+        #         self.logger.log_event("direction_change", {
+        #             "creature_id": self.creature_id,
+        #             "old_angle": old_angle,
+        #             "new_angle": self.angle,
+        #             "position": [self.x, self.y]
+        #         })
 
-        # Évitement d’obstacles
+        print("Zone: ", len(self.zones_decouvertes_uniques))
+        if self.a_trouve_homme_mer:
+            self.angle = math.atan2(homme_a_la_mer.y - self.y, homme_a_la_mer.x - self.x)
+            return
+
+        cell_size = 10
+        max_range = 200
+        cx, cy = int(self.x // cell_size), int(self.y // cell_size)
+
+        target = None
+        best_dist = float("inf")
+        for dx in range(-int(max_range / cell_size), int(max_range / cell_size)):
+            for dy in range(-int(max_range / cell_size), int(max_range / cell_size)):
+                tx, ty = cx + dx, cy + dy
+                if 0 <= tx < constant.LARGEUR_SIMULATION // 10 and 0 <= ty < constant.HAUTEUR_SIMULATION // 10:
+                    zone = (tx, ty)
+                    if zone not in self.zones_decouvertes_uniques:
+                        dist = math.hypot(dx, dy)
+                        if dist < best_dist:
+                            best_dist = dist
+                            target = (tx * cell_size, ty * cell_size)
+
+        if target:
+            self.angle = math.atan2(target[1] - self.y, target[0] - self.x)
+        else:
+            self.angle += random.uniform(-0.3, 0.3)
+
         if self.type_creature == "drone_de_surface":
             for obstacle in obstacles:
                 if obstacle.rect.collidepoint(self.x, self.y):
                     self.eviter_obstacle(obstacle)
-
-        if self.a_trouve_homme_mer:
-            self.angle = math.atan2(homme_a_la_mer.y - self.y, homme_a_la_mer.x - self.x)
 
     def eviter_obstacle(self, obstacle):
         angle_evitement = math.atan2(self.y - obstacle.y, self.x - obstacle.x)

@@ -21,8 +21,8 @@ def main():
     
     nb_drones_surface = 5
     nb_drones_aerien = 5
-    spawn_x = random.randint(0, constant.LARGEUR_SIMULATION)
-    spawn_y = random.randint(0, constant.HAUTEUR_SIMULATION)
+    spawn_x = constant.LARGEUR_SIMULATION/2
+    spawn_y = constant.HAUTEUR_SIMULATION/2
     pourcentage_zone_brouillee = 10 
     
     logger = Logger()

@@ -220,9 +220,7 @@ class Simulation:
         }
 
     def spawn_all_drones(self):
-
-
-        threading.Timer( 0, self.spawn_drone, args=("base",)).start()
+        threading.Timer( 0, self.spawn_drone, args=("base",0, 0)).start()
         for i in range(self.nb_drones_surface):
             angle = (2 * math.pi / self.nb_drones_surface) * i
             vx = math.cos(angle)
@@ -400,14 +398,21 @@ class Simulation:
         
         ecran_simulation = pygame.Surface((constant.LARGEUR_SIMULATION, constant.HAUTEUR_SIMULATION))
         ecran_simulation.fill(constant.BLANC)
-        
+                
+        BLANC = (255, 255, 255)
+
         for zone in self.zones_explorees:
+            temp = sum(1 for creature in self.creatures if zone in creature.zones_decouvertes_uniques)
+            total_drones = len(self.creatures)
+            intensite = temp / total_drones if total_drones > 0 else 0
+            r = int(BLANC[0] * (1 - intensite) + constant.VERT[0] * intensite)
+            g = int(BLANC[1] * (1 - intensite) + constant.VERT[1] * intensite)
+            b = int(BLANC[2] * (1 - intensite) + constant.VERT[2] * intensite)
+            couleur = (r, g, b)
+
             x, y = zone[0] * 10, zone[1] * 10
-            pygame.draw.rect(ecran_simulation, constant.GRIS_CLAIR, (x, y, 10, 10))
-        
-        pygame.draw.circle(ecran_simulation, constant.VERT, (int(self.spawn_x), int(self.spawn_y)), 10, 3)
-        pygame.draw.circle(ecran_simulation, constant.VERT, (int(self.spawn_x), int(self.spawn_y)), 2)
-        
+            pygame.draw.rect(ecran_simulation, couleur, (x, y, 10, 10))
+
         for obstacle in self.obstacles:
             obstacle.dessiner(ecran_simulation)
 

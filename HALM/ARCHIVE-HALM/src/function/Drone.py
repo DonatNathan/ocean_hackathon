@@ -20,9 +20,14 @@ class Drone:
         self.angle = random.uniform(0, 2 * math.pi)
         self.temps_changement_direction = 0
         self.logger = logger
-        
+        self.target = set()
+        self.link = []
         # Système de communication
+        self.contournement_actif = False
+        self.frames_contournement = 0
+        self.direction_contournement = 0
         self.rayon_communication = 50
+        self.distance_detection = 0
         self.communications_reçues = set()
         self.communications_envoyees = 0
         self.communications_echouees = 0
@@ -53,8 +58,8 @@ class Drone:
             self.couleur_trouve = constant.ROUGE_CLAIR
             self.taille = 3
             self.zone_decouverte = 15
-            self.temps_avant_repos = 100
-            self.duree_repos = 20
+            self.temps_avant_repos = 8
+            self.duree_repos = 2
             self.rayon_communication = 50
         elif type_creature == "drone_aerien":
             self.vitesse = constant.FACTEUR_ACCELERATION * 277 / constant.FPS
@@ -62,8 +67,8 @@ class Drone:
             self.couleur_trouve = constant.BLEU_CLAIR
             self.taille = 4
             self.zone_decouverte = 30
-            self.temps_avant_repos = 80
-            self.duree_repos = 15
+            self.temps_avant_repos = 4
+            self.duree_repos = 1.5
             self.rayon_communication = 80
         elif type_creature == "base":
             self.vitesse = 0
@@ -112,8 +117,6 @@ class Drone:
                     "reason": "brouillage"
                 })
             return False
-        if self.type_creature == "base" or autre_creature.type_creature == "base":
-            print("Communication avec la base détectée.")
         current_time = time.time()
         # if autre_creature.creature_id in self.derniere_communication:
         #     temps_derniere = self.derniere_communication[autre_creature.creature_id]
@@ -171,21 +174,26 @@ class Drone:
         return True
     
     def verifier_communications(self, autres_creatures, brouillages, simulation):
-        """Vérifie les communications possibles avec les autres créatures"""
+        """Vérifie les communications et met à jour self.link (liste d'objets)"""
+        self.link = []  # liste de références vers les créatures connectées
         communications_etablies = 0
-        
+
         for autre in autres_creatures:
-            if autre.creature_id != self.creature_id and not autre.epuise and not self.epuise:
-                distance = math.sqrt((self.x - autre.x)**2 + (self.y - autre.y)**2)
-                
-                # Vérifier si les rayons de communication se croisent
-                if distance <= (self.rayon_communication + autre.rayon_communication) / 2:
-                    if self.communiquer_avec(autre, brouillages, simulation):
-                        communications_etablies += 1
-        
+            if autre.creature_id == self.creature_id or autre.epuise or self.epuise:
+                continue
+
+            distance = math.hypot(self.x - autre.x, self.y - autre.y)
+            portee = (self.rayon_communication + autre.rayon_communication) / 2
+
+            if distance <= portee:
+                if self.communiquer_avec(autre, brouillages, simulation):
+                    self.link.append(autre)  # on garde la référence
+                    communications_etablies += 1
+
         return communications_etablies
-        
+            
     def deplacer(self, obstacles, homme_a_la_mer, autres_creatures, brouillages, simulation):
+        self.target = None
         if self.epuise:
             print("[LOG] Créature épuisée, ne se déplace pas.")
             return
@@ -195,10 +203,6 @@ class Drone:
         if not self.en_repos:
             print("[LOG] Vérification des communications.")
             self.verifier_communications(autres_creatures, brouillages, simulation)
-
-        if not self.en_repos and not self.retour_spawn and self.temps_depuis_spawn >= self.temps_avant_repos / 2:
-            print("[LOG] Demi-temps atteint, passage en retour vers spawn.")
-            self.passer_en_retour_spawn()
 
         if self.retour_spawn:
             print("[LOG] Mode retour vers spawn.")
@@ -216,12 +220,31 @@ class Drone:
             print("[LOG] Mode exploration.")
             self.explorer(obstacles, homme_a_la_mer)
 
+        if not self.en_repos and not self.retour_spawn:
+            print("[LOG] Demi-temps atteint, passage en retour vers spawn.")
+            self.passer_en_retour_spawn()
+
         self.mettre_a_jour_zones_explorees()
         self.mettre_a_jour_position(obstacles)
         self.detecter_homme_a_la_mer(homme_a_la_mer)
 
     def passer_en_retour_spawn(self):
-        self.retour_spawn = True
+        if  self.target is None:
+            print("[LOG]  Pas de cible, rien à faire.")
+            return
+        distance_vers_cible = math.hypot(self.target[0] - self.x, self.target[1] - self.y)
+        if self.vitesse == 0:
+            print("[LOG] Vitesse nulle, ne peut pas calculer le temps nécessaire.")
+            return
+        temps_necessaire = distance_vers_cible / self.vitesse
+        if temps_necessaire > self.temps_avant_repos * constant.FPS:
+            print("[LOG] Retour vers spawn initié.", temps_necessaire, self.temps_avant_repos* constant.FPS)
+            self.retour_spawn = True
+            self.target = (self.spawn_x, self.spawn_y)
+        else:
+            print("[LOG] Temps nécessaire pour atteindre la cible est inférieur au temps avant repos, pas de retour vers spawn.")
+            return
+
         if self.logger:
             self.logger.log_event("creature_state_change", {
                 "creature_id": self.creature_id,
@@ -234,7 +257,7 @@ class Drone:
     def gerer_retour_spawn(self):
         dist_spawn = math.dist((self.x, self.y), (self.spawn_x, self.spawn_y))
 
-        if dist_spawn < 5:
+        if dist_spawn < 5 and self.retour_spawn:
             self.entrer_en_repos()
             return True
         else:
@@ -296,61 +319,74 @@ class Drone:
             self.angle = math.atan2(homme_a_la_mer.y - self.y, homme_a_la_mer.x - self.x)
             return
 
+        rayon = self.zone_decouverte // 10
+
         cell_size = 10
         max_range = 200
-        rayon_detection_cell = self.zone_decouverte // cell_size  # rayon en cellules
         cx, cy = int(self.x // cell_size), int(self.y // cell_size)
 
-        target = None
+        self.target = None
         best_dist = float("inf")
-
-        # Parcours des zones dans un rayon max_range
-        for dx in range(-int(max_range / cell_size), int(max_range / cell_size) + 1):
-            for dy in range(-int(max_range / cell_size), int(max_range / cell_size) + 1):
+        for dx in range(-int(max_range / cell_size), int(max_range / cell_size)):
+            for dy in range(-int(max_range / cell_size), int(max_range / cell_size)):
                 tx, ty = cx + dx, cy + dy
-                
-                # Vérifier les limites
-                if not (0 <= tx < constant.LARGEUR_SIMULATION // cell_size and 
-                        0 <= ty < constant.HAUTEUR_SIMULATION // cell_size):
-                    continue
+                if 0 <= tx < constant.LARGEUR_SIMULATION // 10 and 0 <= ty < constant.HAUTEUR_SIMULATION // 10:
+                    zone = (tx, ty)
+                    if zone not in self.zones_decouvertes_uniques:
+                        dist = math.hypot(dx, dy)
+                        if dist < best_dist:
+                            best_dist = dist
+                            self.target = (tx * cell_size, ty * cell_size)
 
-                zone = (tx, ty)
-
-                # Ignorer si déjà explorée
-                if zone in self.zones_decouvertes_uniques:
-                    continue
-
-                # Ignorer si déjà détectable depuis la position actuelle
-                if dx*dx + dy*dy <= rayon_detection_cell * rayon_detection_cell:
-                    continue  # Pas besoin d'y aller : on la "voit" déjà
-
-                # Sinon, c'est une zone non couverte → considérer comme cible potentielle
-                dist = math.hypot(dx, dy)
-                if dist < best_dist:
-                    best_dist = dist
-                    target = (tx * cell_size + cell_size // 2, ty * cell_size + cell_size // 2)  # centre de la cellule
-
-        if target:
-            self.angle = math.atan2(target[1] - self.y, target[0] - self.x)
+        if self.target:
+            self.angle = math.atan2(self.target[1] - self.y, self.target[0] - self.x)
         else:
             self.angle += random.uniform(-0.3, 0.3)
+        if self.type_creature == "drone_de_surface" and self.target is not None:
+            if self.contournement_actif:
+                self.frames_contournement -= 1
+                if self.frames_contournement <= 0:
+                    self.contournement_actif = False
+            else:
+                dx = self.target[0] - self.x
+                dy = self.target[1] - self.y
+                distance_vers_cible = math.hypot(dx, dy)
 
-        if self.type_creature == "drone_de_surface":
-            for obstacle in obstacles:
-                if obstacle.rect.collidepoint(self.x, self.y):
-                    self.eviter_obstacle(obstacle)
+                if distance_vers_cible > 0:
+                    dir_x = dx / distance_vers_cible
+                    dir_y = dy / distance_vers_cible
+                    self.distance_detection = min(100.0, distance_vers_cible)
+                    future_x = self.x + dir_x * self.distance_detection
+                    future_y = self.y + dir_y * self.distance_detection
 
-    def eviter_obstacle(self, obstacle):
-        angle_evitement = math.atan2(self.y - obstacle.y, self.x - obstacle.x)
-        self.angle = angle_evitement
-        if self.logger:
-            self.logger.log_event("obstacle_avoidance", {
-                "creature_id": self.creature_id,
-                "creature_type": self.type_creature,
-                "obstacle_position": [obstacle.x, obstacle.y],
-                "new_angle": self.angle,
-                "position": [self.x, self.y]
-            })
+                    obstacle_trouve = None
+                    for obstacle in obstacles:
+                        if obstacle.rect.collidepoint(future_x, future_y):
+                            obstacle_trouve = obstacle
+                            break
+
+                    if obstacle_trouve:
+                        print("[LOG] Obstacle détecté activation du contournement.")
+                        self.demarrer_contournement(obstacle_trouve)
+
+    def demarrer_contournement(self, obstacle):
+        """Démarre un contournement déterministe (toujours à droite) pendant N frames."""
+        dx = self.x - obstacle.x
+        dy = self.y - obstacle.y
+        distance = math.hypot(dx, dy)
+
+        if distance == 0:
+            direction = 0.0
+        else:
+            direction = math.atan2(dy, dx)
+
+        # Toujours à droite
+        self.angle = direction - math.pi / 2
+        self.angle = (self.angle + math.pi) % (2 * math.pi) - math.pi
+
+        # Activer le mode contournement pendant 20 frames (ajuste selon la taille des obstacles)
+        self.contournement_actif = True
+        self.frames_contournement = 5
 
     def mettre_a_jour_position(self, obstacles):
         self.vx = math.cos(self.angle) * self.vitesse
@@ -460,6 +496,22 @@ class Drone:
             elif self.retour_spawn:
                 pygame.draw.circle(ecran_simulation, constant.ORANGE, (int(self.x), int(self.y - 10)), 2)
 
+            if self.target:
+                pygame.draw.line(
+                    ecran_simulation,                     # surface sur laquelle dessiner
+                    (255, 0, 0),                # couleur rouge (R, G, B)
+                    (int(self.x), int(self.y)), # point de départ : position actuelle
+                    (int(self.target[0]), int(self.target[1])),  # point d'arrivée : cible
+                    width=2                     # épaisseur de la ligne (optionnel, par défaut 1)
+                )
+            for autre in self.link:
+                pygame.draw.line(
+                    ecran_simulation,
+                    constant.BLEU_CLAIR,
+                    (int(self.x), int(self.y)),
+                    (int(autre.x), int(autre.y)),
+                    width=1
+                )
             if len(self.communications_reçues) > 0:
                 font_com = pygame.font.Font(None, 14)
                 text_com = font_com.render(f"C:{len(self.communications_reçues)}", True, constant.VIOLET)

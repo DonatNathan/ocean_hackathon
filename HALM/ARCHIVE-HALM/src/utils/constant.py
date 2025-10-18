@@ -2,7 +2,7 @@
 # Configuration
 LARGEUR = 1200
 HAUTEUR = 900
-FPS = 10
+FPS = 60
 FACTEUR_ACCELERATION = 1
 
 # Couleurs

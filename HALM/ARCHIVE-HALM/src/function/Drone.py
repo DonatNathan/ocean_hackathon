@@ -103,27 +103,22 @@ class Drone:
                     "reason": "brouillage"
                 })
             return False
-        
+
         current_time = time.time()
-        
-        # Vérifier le cooldown pour éviter les communications répétées
         if autre_creature.creature_id in self.derniere_communication:
             temps_derniere = self.derniere_communication[autre_creature.creature_id]
             if current_time - temps_derniere < self.cooldown_communication:
                 return False
-        
-        # Échanger les informations (numéros des créatures)
+
         self.communications_reçues.add(autre_creature.creature_id)
         autre_creature.communications_reçues.add(self.creature_id)
-        
+
         self.communications_envoyees += 1
         autre_creature.communications_envoyees += 1
-        
-        # Mettre à jour le timestamp de dernière communication
+
         self.derniere_communication[autre_creature.creature_id] = current_time
         autre_creature.derniere_communication[self.creature_id] = current_time
-        
-        # Identifier les types pour éviter le double comptage
+
         type1 = self.type_creature
         type2 = autre_creature.type_creature
 
@@ -131,10 +126,9 @@ class Drone:
             simulation.comms_surface_surface += 1
         elif type1 == "drone_aerien" and type2 == "drone_aerien":
             simulation.comms_aerien_aerien += 1
-        else: # Un de chaque type
+        else:
             simulation.comms_surface_aerien += 1
 
-        # Log de la communication
         if self.logger:
             distance = math.sqrt((self.x - autre_creature.x)**2 + (self.y - autre_creature.y)**2)
             self.logger.log_event("communication_established", {
@@ -154,7 +148,15 @@ class Drone:
                     "creature_2_contacts": len(autre_creature.communications_reçues)
                 }
             })
-        
+
+        nouvelles_zones_recues = autre_creature.zone_exploree - self.zone_exploree
+        nouvelles_zones_envoyees = self.zone_exploree - autre_creature.zone_exploree
+
+        self.zone_exploree.update(autre_creature.zone_exploree)
+        autre_creature.zone_exploree.update(self.zone_exploree)
+
+        self.zones_decouvertes_uniques.update(nouvelles_zones_recues)
+        autre_creature.zones_decouvertes_uniques.update(nouvelles_zones_envoyees)
         return True
     
     def verifier_communications(self, autres_creatures, brouillages, simulation):

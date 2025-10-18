@@ -23,6 +23,9 @@ class Drone:
         self.target = set()
         self.link = []
         # Système de communication
+        # Dans __init__ de ta classe (ex: Agent, Drone, etc.)
+        self.radar_progression = 0.0  # en secondes ou en proportion (0 à 1)
+        self.radar_duree = 1.5  # durée en secondes pour un cycle complet (ajuste selon envie)
         self.contournement_actif = False
         self.frames_contournement = 0
         self.direction_contournement = 0
@@ -34,7 +37,8 @@ class Drone:
         self.derniere_communication = {}
         self.cooldown_communication = 1.0
         self.tentatives_communication = 0
-        
+        self.homme_positions_connues = None
+
         # États de repos
         self.temps_depuis_spawn = 0
         self.en_repos = False
@@ -63,12 +67,12 @@ class Drone:
             self.rayon_communication = 50
         elif type_creature == "drone_aerien":
             self.vitesse = constant.FACTEUR_ACCELERATION * 277 / constant.FPS
-            self.couleur = constant.BLEU
-            self.couleur_trouve = constant.BLEU_CLAIR
+            self.couleur = constant.JAUNE
+            self.couleur_trouve = constant.JAUNE
             self.taille = 4
             self.zone_decouverte = 30
             self.temps_avant_repos = 10
-            self.duree_repos = 1.5
+            self.duree_repos = 1
             self.rayon_communication = 80
         elif type_creature == "base":
             self.vitesse = 0
@@ -173,6 +177,10 @@ class Drone:
 
         self.zones_decouvertes_uniques.update(nouvelles_zones_recues)
         autre_creature.zones_decouvertes_uniques.update(nouvelles_zones_envoyees)
+        if self.a_trouve_homme_mer:
+            autre_creature.a_trouve_homme_mer = True
+            autre_creature.homme_positions_connues = self.homme_positions_connues
+            autre_creature.temps_premiere_decouverte_homme_mer = self.temps_premiere_decouverte_homme_mer
         return True
     
     def verifier_communications(self, autres_creatures, brouillages, simulation):
@@ -323,7 +331,7 @@ class Drone:
     
     def explorer(self, obstacles, homme_a_la_mer):
         if self.a_trouve_homme_mer:
-            self.angle = math.atan2(homme_a_la_mer.y - self.y, homme_a_la_mer.x - self.x)
+            self.retour_spawn = True
             return
 
         cell_size = 10
@@ -469,6 +477,7 @@ class Drone:
         if dist < self.zone_decouverte and not self.a_trouve_homme_mer:
             self.a_trouve_homme_mer = True
             self.couleur = self.couleur_trouve
+            self.homme_positions_connues = (homme_a_la_mer.x, homme_a_la_mer.y)
             self.temps_premiere_decouverte_homme_mer = time.time()
 
             if self.logger:
@@ -518,8 +527,32 @@ class Drone:
         else:
             if afficher_cercles_communication and not self.est_dans_zone_brouillage(brouillages):
                 surface_communication = pygame.Surface((self.rayon_communication * 2, self.rayon_communication * 2), pygame.SRCALPHA)
-                pygame.draw.circle(surface_communication, (*constant.CYAN, 30), (self.rayon_communication, self.rayon_communication), self.rayon_communication)
-                ecran_simulation.blit(surface_communication, (self.x - self.rayon_communication, self.y - self.rayon_communication))          
+                self.radar_progression += self.temps_depuis_spawn / constant.FPS
+                if self.radar_progression >= self.radar_duree:
+                    self.radar_progression = 0.0
+                pygame.draw.circle(
+                    surface_communication,
+                    (*constant.BLANC, 30), 
+                    (self.rayon_communication, self.rayon_communication),
+                    self.rayon_communication,
+                    width=2
+                )
+
+                progression = self.radar_progression / self.radar_duree
+                rayon_radar = progression * self.rayon_communication
+                pygame.draw.circle(
+                    surface_communication,
+                    (*constant.BLANC, 180),
+                    (self.rayon_communication, self.rayon_communication),
+                    max(1, int(rayon_radar)),
+                    width=2
+                )
+
+                # --- Blit sur l'écran ---
+                ecran_simulation.blit(
+                    surface_communication,
+                    (self.x - self.rayon_communication, self.y - self.rayon_communication)
+                )
             if self.a_trouve_homme_mer:
                 pygame.draw.circle(ecran_simulation, (*self.couleur_trouve, 50), (int(self.x), int(self.y)), self.zone_decouverte, 2)
 
@@ -542,21 +575,21 @@ class Drone:
             elif self.retour_spawn:
                 pygame.draw.circle(ecran_simulation, constant.ORANGE, (int(self.x), int(self.y - 10)), 2)
 
-            if self.target:
-                pygame.draw.line(
-                    ecran_simulation,                     # surface sur laquelle dessiner
-                    (255, 0, 0),                # couleur rouge (R, G, B)
-                    (int(self.x), int(self.y)), # point de départ : position actuelle
-                    (int(self.target[0]), int(self.target[1])),  # point d'arrivée : cible
-                    width=2                     # épaisseur de la ligne (optionnel, par défaut 1)
-                )
+            # if self.target:
+            #     pygame.draw.line(
+            #         ecran_simulation,
+            #         (255, 0, 0),
+            #         (int(self.x), int(self.y)),
+            #         (int(self.target[0]), int(self.target[1])),
+            #         width=2
+            #     )
             for autre in self.link:
                 pygame.draw.line(
                     ecran_simulation,
-                    constant.BLEU_CLAIR,
+                    constant.VERT,
                     (int(self.x), int(self.y)),
                     (int(autre.x), int(autre.y)),
-                    width=1
+                    width=2
                 )
             if len(self.communications_reçues) > 0:
                 font_com = pygame.font.Font(None, 14)

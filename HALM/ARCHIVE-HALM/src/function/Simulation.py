@@ -40,6 +40,8 @@ class Simulation:
         self.boats = []
         self.mode = mode
         
+        self.base_coord = None
+        self.homme_coord = None
         # Nouveaux compteurs de communication
         self.comms_surface_surface = 0
         self.comms_surface_aerien = 0
@@ -182,7 +184,7 @@ class Simulation:
         duree_simulation = (self.temps_fin or time.time()) - self.temps_debut
         vitesse_exploration = zones_decouvertes_total / duree_simulation if duree_simulation > 0 else 0
         
-        ont_trouve_homme_mer = sum(1 for c in creatures_type if c.a_trouve_homme_mer)
+        ont_trouve_homme_mer = sum(1 for c in creatures_type if (c.a_trouve_homme_mer and c.type_creature == "base"))
         temps_decouverte_totaux = [c.temps_premiere_decouverte_homme_mer - self.temps_debut for c in creatures_type if c.a_trouve_homme_mer]
         temps_moyen_decouverte = sum(temps_decouverte_totaux) / len(temps_decouverte_totaux) if temps_decouverte_totaux else None
         
@@ -267,23 +269,17 @@ class Simulation:
             constant.largeur = random.randint(20, 80)
             hauteur = random.randint(20, 80)
             self.obstacles.append(Obstacle(x, y, constant.largeur, hauteur))
-
-        # Génération des zones de brouillage par pourcentage
         surface_totale = constant.LARGEUR_SIMULATION * constant.HAUTEUR_SIMULATION
         surface_brouillage_cible = surface_totale * (self.pourcentage_brouillage / 100.0)
         surface_brouillage_actuelle = 0
         max_zones = 200 
-        
         while surface_brouillage_actuelle < surface_brouillage_cible and len(self.brouillages) < max_zones:
             constant.largeur = random.randint(40, 120)
             hauteur = random.randint(40, 120)
             x = random.randint(0, constant.LARGEUR_SIMULATION - constant.largeur)
             y = random.randint(0, constant.HAUTEUR_SIMULATION - hauteur)
-            
             self.brouillages.append(Brouillage(x, y, constant.largeur, hauteur))
             surface_brouillage_actuelle += constant.largeur * hauteur
-        
-        # Sauvegarder le pourcentage réel pour les statistiques
         if surface_totale > 0:
             self.pourcentage_brouillage_reel = (surface_brouillage_actuelle / surface_totale) * 100
         
@@ -357,7 +353,7 @@ class Simulation:
                 return True
         return False
     
-    def mettre_a_jour(self):
+    def mettre_a_jour(self, ecran_simulation):
 
         for boat in self.boats:
             boat.move()
@@ -378,7 +374,12 @@ class Simulation:
             
         for creature in self.creatures:
             creature.deplacer(self.obstacles, self.homme_a_la_mer, self.creatures, self.brouillages, self)
-            if creature.a_trouve_homme_mer and not self.homme_a_la_mer_decouvert:
+            if creature.a_trouve_homme_mer and creature.type_creature != "base":
+                self.homme_a_la_mer.decouvert= True
+                self.homme_a_la_mer.dessiner(ecran_simulation)
+            if creature.a_trouve_homme_mer and creature.type_creature == "base":
+                self.base_coord = (creature.x, creature.y)
+                self.homme_coord = (creature.homme_positions_connues[0], creature.homme_positions_connues[1])
                 self.homme_a_la_mer_decouvert = True
                 self.homme_a_la_mer.decouvert = True
                 self.temps_decouverte = pygame.time.get_ticks()
@@ -386,7 +387,6 @@ class Simulation:
                 self.premiere_decouverte_homme_mer = creature.temps_premiere_decouverte_homme_mer
                 self.qui_a_trouve_homme_mer = f"{creature.type_creature}_{creature.creature_id}"
                 self.pause_automatique = True
-                
                 if self.logger:
                     self.logger.log_event("simulation_completed", {
                         "winner": self.qui_a_trouve_homme_mer,
@@ -395,7 +395,6 @@ class Simulation:
                         "homme_a_la_mer_position": [self.homme_a_la_mer.x, self.homme_a_la_mer.y],
                         "winner_communications": len(creature.communications_reçues)
                     })
-                
         self.zones_explorees = set()
         for creature in self.creatures:
             self.zones_explorees.update(creature.zone_exploree)
@@ -411,34 +410,29 @@ class Simulation:
             self.logger.log_frame(self.creatures, simulation_state)
     
     def dessiner(self, ecran, afficher_cercles_communication):
-        ecran.fill(constant.BLANC)
-        
-        pygame.draw.rect(ecran, constant.COULEUR_UI_FOND, (0, 0, constant.LARGEUR, constant.HAUTEUR_ENTETE))
-        pygame.draw.rect(ecran, constant.COULEUR_UI_CONTOUR, (0, 0, constant.LARGEUR, constant.HAUTEUR_ENTETE), 1)
-        font_titre = pygame.font.Font(None, 40)
-        text_titre = font_titre.render("Simulation de Drones", True, constant.NOIR)
-        ecran.blit(text_titre, (constant.LARGEUR // 2 - text_titre.get_width() // 2, 15))
-        pygame.draw.rect(ecran, constant.ORANGE, (10, 10, 40, 40))
-        
-        pygame.draw.rect(ecran, constant.COULEUR_UI_FOND, (constant.LARGEUR_SIMULATION, constant.HAUTEUR_ENTETE, constant.LARGEUR_BARRE_LATERALE, constant.HAUTEUR - constant.HAUTEUR_ENTETE))
-        pygame.draw.rect(ecran, constant.COULEUR_UI_CONTOUR, (constant.LARGEUR_SIMULATION, constant.HAUTEUR_ENTETE, constant.LARGEUR_BARRE_LATERALE, constant.HAUTEUR - constant.HAUTEUR_ENTETE), 1)
-        
+        ecran.fill(constant.GRIS)
+        pygame.draw.rect(ecran, constant.NOIR, (0, 0, constant.LARGEUR, constant.HAUTEUR_ENTETE))
         ecran_simulation = pygame.Surface((constant.LARGEUR_SIMULATION, constant.HAUTEUR_SIMULATION))
-        ecran_simulation.fill(constant.BLANC)
-                
-        BLANC = (255, 255, 255)
+        ecran_simulation.fill(constant.NOIR)
 
         for zone in self.zones_explorees:
             temp = sum(1 for creature in self.creatures if zone in creature.zones_decouvertes_uniques)
             total_drones = len(self.creatures)
-            intensite = temp / total_drones if total_drones > 0 else 0
-            r = int(BLANC[0] * (1 - intensite) + constant.VERT[0] * intensite)
-            g = int(BLANC[1] * (1 - intensite) + constant.VERT[1] * intensite)
-            b = int(BLANC[2] * (1 - intensite) + constant.VERT[2] * intensite)
+            intensite = (temp / total_drones if total_drones > 0 else 0)
+            intensite_effective = 0.5 + 0.5 * intensite
+            r = int(constant.NOIR[0] * (1 - intensite_effective) + constant.BLEU[0] * intensite_effective)
+            g = int(constant.NOIR[1] * (1 - intensite_effective) + constant.BLEU[1] * intensite_effective)
+            b = int(constant.NOIR[2] * (1 - intensite_effective) + constant.BLEU[2] * intensite_effective)
             couleur = (r, g, b)
 
             x, y = zone[0] * 10, zone[1] * 10
-            pygame.draw.rect(ecran_simulation, couleur, (x, y, 10, 10))
+            pygame.draw.circle(
+                    ecran_simulation,
+                    couleur,
+                    (x, y),
+                    10,
+                    width=1
+                )
 
         for obstacle in self.obstacles:
             obstacle.dessiner(ecran_simulation)
@@ -461,6 +455,14 @@ class Simulation:
             text = font.render("SIMULATION ÉCHOUÉE (Tous les drones sont épuisés) !", True, constant.ROUGE)
             ecran_simulation.blit(text, (constant.LARGEUR_SIMULATION // 2 - text.get_width() // 2, constant.HAUTEUR_SIMULATION // 2))
 
+        if(self.base_coord and self.homme_coord):
+            pygame.draw.line(
+                ecran_simulation,
+                constant.ROUGE,
+                self.base_coord,
+                self.homme_coord,
+                width=2
+            )
         ecran.blit(ecran_simulation, (0, constant.HAUTEUR_ENTETE))
 
         self.afficher_info(ecran)
@@ -470,10 +472,10 @@ class Simulation:
         font_info = pygame.font.Font(None, 20)
         
         y_stats = constant.HAUTEUR_ENTETE + 10
-        pygame.draw.rect(ecran, constant.BLANC, (constant.LARGEUR_SIMULATION + 5, y_stats, constant.LARGEUR_BARRE_LATERALE - 10, (constant.HAUTEUR-constant.HAUTEUR_ENTETE)//2 - 15), 0, 5)
-        pygame.draw.rect(ecran, constant.COULEUR_UI_CONTOUR, (constant.LARGEUR_SIMULATION + 5, y_stats, constant.LARGEUR_BARRE_LATERALE - 10, (constant.HAUTEUR-constant.HAUTEUR_ENTETE)//2 - 15), 1, 5)
+        pygame.draw.rect(ecran, constant.NOIR, (constant.LARGEUR_SIMULATION + 5, y_stats, constant.LARGEUR_BARRE_LATERALE - 10, (constant.HAUTEUR-constant.HAUTEUR_ENTETE)//2 - 15), 0, 5)
+        pygame.draw.rect(ecran, constant.GRIS, (constant.LARGEUR_SIMULATION + 5, y_stats, constant.LARGEUR_BARRE_LATERALE - 10, (constant.HAUTEUR-constant.HAUTEUR_ENTETE)//2 - 15), 1, 5)
 
-        text_stats_titre = font_section.render("Statistiques", True, constant.NOIR)
+        text_stats_titre = font_section.render("Statistiques", True, constant.GRIS)
         ecran.blit(text_stats_titre, (constant.LARGEUR_SIMULATION + 15, y_stats + 5))
         y_stats += 30
 
@@ -490,7 +492,7 @@ class Simulation:
         y_stats += 20
         total_zones = (constant.LARGEUR_SIMULATION // 10) * (constant.HAUTEUR_SIMULATION // 10)
         pourcentage = (len(self.zones_explorees) / total_zones) * 100
-        text = font_info.render(f"Zones explorées: {pourcentage:.1f}%", True, constant.NOIR)
+        text = font_info.render(f"Zones explorées: {pourcentage:.1f}%", True, constant.BLANC)
         ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_stats))
         y_stats += 20
         communications_reussies = self.comms_surface_surface + self.comms_surface_aerien + self.comms_aerien_aerien
@@ -511,37 +513,37 @@ class Simulation:
             ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_stats))
             y_stats += 20
         
-        y_commandes = constant.HAUTEUR_ENTETE + (constant.HAUTEUR-constant.HAUTEUR_ENTETE)//2 + 5
-        pygame.draw.rect(ecran, constant.BLANC, (constant.LARGEUR_SIMULATION + 5, y_commandes, constant.LARGEUR_BARRE_LATERALE - 10, (constant.HAUTEUR-constant.HAUTEUR_ENTETE)//2 - 10), 0, 5)
-        pygame.draw.rect(ecran, constant.COULEUR_UI_CONTOUR, (constant.LARGEUR_SIMULATION + 5, y_commandes, constant.LARGEUR_BARRE_LATERALE - 10, (constant.HAUTEUR-constant.HAUTEUR_ENTETE)//2 - 10), 1, 5)
+        # y_commandes = constant.HAUTEUR_ENTETE + (constant.HAUTEUR-constant.HAUTEUR_ENTETE)//2 + 5
+        # pygame.draw.rect(ecran, constant.BLANC, (constant.LARGEUR_SIMULATION + 5, y_commandes, constant.LARGEUR_BARRE_LATERALE - 10, (constant.HAUTEUR-constant.HAUTEUR_ENTETE)//2 - 10), 0, 5)
+        # pygame.draw.rect(ecran, constant.COULEUR_UI_CONTOUR, (constant.LARGEUR_SIMULATION + 5, y_commandes, constant.LARGEUR_BARRE_LATERALE - 10, (constant.HAUTEUR-constant.HAUTEUR_ENTETE)//2 - 10), 1, 5)
 
-        text_commandes_titre = font_section.render("Commandes et Légende", True, constant.NOIR)
-        ecran.blit(text_commandes_titre, (constant.LARGEUR_SIMULATION + 15, y_commandes + 5))
-        y_commandes += 30
+        # text_commandes_titre = font_section.render("Commandes et Légende", True, constant.NOIR)
+        # ecran.blit(text_commandes_titre, (constant.LARGEUR_SIMULATION + 15, y_commandes + 5))
+        # y_commandes += 30
 
-        instructions = [
-            "Clic - Changer point de départ", "R - Redémarrer", "1 - Ajouter Drone de Surface",
-            "2 - Ajouter Drone Aérien", "Q - Retirer Drone de Surface", "W - Retirer Drone Aérien",
-            "Espace - Pause", "L - Sauvegarder logs", "C - Activer/désactiver cercles",
-            "S - Sauvegarder stats"
-        ]
+        # instructions = [
+        #     "Clic - Changer point de départ", "R - Redémarrer", "1 - Ajouter Drone de Surface",
+        #     "2 - Ajouter Drone Aérien", "Q - Retirer Drone de Surface", "W - Retirer Drone Aérien",
+        #     "Espace - Pause", "L - Sauvegarder logs", "C - Activer/désactiver cercles",
+        #     "S - Sauvegarder stats"
+        # ]
         
-        for i, instruction in enumerate(instructions):
-            text = font_info.render(instruction, True, constant.NOIR)
-            ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_commandes + i * 20))
+        # for i, instruction in enumerate(instructions):
+        #     text = font_info.render(instruction, True, constant.NOIR)
+        #     ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_commandes + i * 20))
 
-        y_commandes += len(instructions) * 20 + 10
+        # y_commandes += len(instructions) * 20 + 10
         
-        legende = [
-            "États des Drones:", "• Vert: En repos", "• Orange: Retour au départ",
-            "• Croix: Épuisé", "• C:X: X contacts",
-            "Drones de Surface: 40s exploration, 20s repos",
-            "Drones Aériens: 20s exploration, 15s repos",
-        ]
+        # legende = [
+        #     "États des Drones:", "• Vert: En repos", "• Orange: Retour au départ",
+        #     "• Croix: Épuisé", "• C:X: X contacts",
+        #     "Drones de Surface: 40s exploration, 20s repos",
+        #     "Drones Aériens: 20s exploration, 15s repos",
+        # ]
         
-        for i, ligne in enumerate(legende):
-            text = font_info.render(ligne, True, constant.NOIR)
-            ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_commandes + i * 20))
+        # for i, ligne in enumerate(legende):
+        #     text = font_info.render(ligne, True, constant.NOIR)
+        #     ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_commandes + i * 20))
         
         if constant.en_pause:
             constant.font = pygame.font.Font(None, 72)

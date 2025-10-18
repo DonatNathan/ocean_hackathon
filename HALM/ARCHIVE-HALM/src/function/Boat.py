@@ -31,7 +31,7 @@ class Boat:
         self.speed = speed
         self.sizeX = 100
         self.sizeY = 30
-        self.color = constant.NOIR
+        self.color = constant.BLANC
 
         # "Man overboard" control
         self.has_dropped_man = False

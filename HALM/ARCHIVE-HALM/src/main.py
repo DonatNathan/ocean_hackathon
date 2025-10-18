@@ -20,7 +20,7 @@ def main():
     horloge = pygame.time.Clock()
     
     nb_drones_surface = 0
-    nb_drones_aerien = 10
+    nb_drones_aerien = 15
     spawn_x = constant.LARGEUR_SIMULATION/2
     spawn_y = constant.HAUTEUR_SIMULATION/2
     pourcentage_zone_brouillee = 10 
@@ -110,9 +110,9 @@ def main():
                         print(f"Logs sauvegardés: {fichier_log}")
 
         if not constant.en_pause and not simulation.pause_automatique:
-            simulation.mettre_a_jour()
+            simulation.mettre_a_jour(ecran)
         elif mode == "boat":
-            simulation.mettre_a_jour()
+            simulation.mettre_a_jour(ecran)
         
         simulation.dessiner(ecran, afficher_cercles_communication)
         

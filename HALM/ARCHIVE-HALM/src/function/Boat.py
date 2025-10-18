@@ -3,6 +3,7 @@ import random
 import math
 from utils import constant
 from .Drone import Drone
+from .HommeALaMer import HommeALaMer
 
 
 class Boat:
@@ -34,7 +35,7 @@ class Boat:
 
         # "Man overboard" control
         self.has_dropped_man = False
-        self.man_overboard_pos = None
+        self.man_overboard = None
         self.detached = False
 
         # Store current travel angle (for rotation / direction)
@@ -92,7 +93,6 @@ class Boat:
             )
             self.drones.append(drone)
 
-
     # ------------------------------------------------------------ #
     def move(self):
         """Move boat according to its direction vector and update attached drones."""
@@ -136,9 +136,8 @@ class Boat:
             drop_distance = 30
             drop_x = self.x - self.direction_vector[0] * drop_distance
             drop_y = self.y - self.direction_vector[1] * drop_distance
-            self.man_overboard_pos = (drop_x, drop_y)
-            print(f"[EVENT] Man overboard at {self.man_overboard_pos}")
-            return self.man_overboard_pos
+            self.man_overboard = HommeALaMer(drop_x, drop_y)
+            return self.man_overboard
         return None
 
     def send_drones(self):
@@ -186,8 +185,9 @@ class Boat:
             )
 
         # --- draw the man overboard, if present ---
-        if self.has_dropped_man and self.man_overboard_pos:
-            mx, my = self.man_overboard_pos
+        if self.has_dropped_man and self.man_overboard:
+            mx = self.man_overboard.x
+            my = self.man_overboard.y
 
             # Red life jacket + skin center
             pygame.draw.circle(screen, (255, 0, 0), (int(mx), int(my)), 6)

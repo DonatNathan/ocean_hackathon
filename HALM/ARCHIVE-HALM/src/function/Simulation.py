@@ -1,5 +1,3 @@
-
-
 import random
 import pygame
 import time
@@ -363,6 +361,9 @@ class Simulation:
 
         for boat in self.boats:
             boat.move()
+            if boat.detached:
+                for drone in boat.drones:
+                    drone.deplacer(self.obstacles, boat.man_overboard, boat.drones, self.brouillages, self)
 
         if not self.homme_a_la_mer_decouvert and all(c.epuise for c in self.creatures):
             if not self.pause_automatique:

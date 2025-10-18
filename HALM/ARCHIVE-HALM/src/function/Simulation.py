@@ -5,6 +5,7 @@ import pygame
 import time
 import os
 import json
+import threading
 from utils import constant
 from datetime import datetime
 from utils import constant
@@ -218,15 +219,19 @@ class Simulation:
             "taux_reussite_communication": round(taux_reussite_communication, 2)
         }
 
+    def spawn_drone(self, drone_type, delay=0.5):
+        creature_id = self.get_next_creature_id()
+        self.creatures.append(Drone(self.spawn_x, self.spawn_y, self.spawn_x, self.spawn_y, drone_type, self.logger, creature_id))
+
     def generer_monde(self):
+
         for i in range(self.nb_drones_surface):
-            creature_id = self.get_next_creature_id()
-            self.creatures.append(Drone(self.spawn_x, self.spawn_y, self.spawn_x, self.spawn_y, "drone_de_surface", self.logger, creature_id))
-        
+            threading.Timer(i, self.spawn_drone, args=("drone_de_surface",)).start()
+
+        offset = self.nb_drones_surface * 0.5
         for i in range(self.nb_drones_aerien):
-            creature_id = self.get_next_creature_id()
-            self.creatures.append(Drone(self.spawn_x, self.spawn_y, self.spawn_x, self.spawn_y, "drone_aerien", self.logger, creature_id))
-        
+            threading.Timer(offset + 0.5 * i, self.spawn_drone, args=("drone_aerien",)).start()
+
         
         for i in range(15):
             x = random.randint(0, constant.LARGEUR_SIMULATION - 100)

@@ -292,7 +292,9 @@ class Drone:
         #             "position": [self.x, self.y]
         #         })
 
-        print("Zone: ", len(self.zones_decouvertes_uniques))
+        print("ID Drone: ", self.creature_id)
+        print("Communication: ", len(self.zones_decouvertes_uniques))
+
         if self.a_trouve_homme_mer:
             self.angle = math.atan2(homme_a_la_mer.y - self.y, homme_a_la_mer.x - self.x)
             return

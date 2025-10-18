@@ -6,13 +6,13 @@ import time
 from utils import constant
 
 class Drone:
-    def __init__(self, x, y, spawn_x, spawn_y, type_creature="drone_de_surface", logger=None, creature_id=0):
+    def __init__(self, x, y, spawn_x, spawn_y, vx, vy, type_creature="drone_de_surface", logger=None, creature_id=0):
         self.x = x
         self.y = y
         self.spawn_x = spawn_x
         self.spawn_y = spawn_y
-        self.vx = random.uniform(-1, 1)
-        self.vy = random.uniform(-1, 1)
+        self.vx = vx
+        self.vy = vy
         self.type_creature = type_creature
         self.creature_id = creature_id
         self.zone_exploree = set()
@@ -279,18 +279,6 @@ class Drone:
             return True
 
     def explorer(self, obstacles, homme_a_la_mer):
-        # self.temps_changement_direction += 1
-        # if self.temps_changement_direction > 60:
-        #     old_angle = self.angle
-        #     self.angle += random.uniform(-0.5, 0.5)
-        #     self.temps_changement_direction = 0
-        #     if self.logger:
-        #         self.logger.log_event("direction_change", {
-        #             "creature_id": self.creature_id,
-        #             "old_angle": old_angle,
-        #             "new_angle": self.angle,
-        #             "position": [self.x, self.y]
-        #         })
 
         print("ID Drone: ", self.creature_id)
         print("Communication: ", len(self.zones_decouvertes_uniques))

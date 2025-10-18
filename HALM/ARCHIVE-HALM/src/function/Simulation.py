@@ -6,6 +6,7 @@ import time
 import os
 import json
 import threading
+import math
 from utils import constant
 from datetime import datetime
 from utils import constant
@@ -154,7 +155,6 @@ class Simulation:
             print(f"Erreur lors de la sauvegarde: {e}")
             return None
     
-
     def _calculer_stats_type(self, type_creature):
         creatures_type = [c for c in self.creatures if c.type_creature == type_creature]
         
@@ -219,19 +219,28 @@ class Simulation:
             "taux_reussite_communication": round(taux_reussite_communication, 2)
         }
 
-    def spawn_drone(self, drone_type, delay=0.5):
-        creature_id = self.get_next_creature_id()
-        self.creatures.append(Drone(self.spawn_x, self.spawn_y, self.spawn_x, self.spawn_y, drone_type, self.logger, creature_id))
-
-    def generer_monde(self):
+    def spawn_all_drones(self):
 
         for i in range(self.nb_drones_surface):
-            threading.Timer(i, self.spawn_drone, args=("drone_de_surface",)).start()
+            angle = (2 * math.pi / self.nb_drones_surface) * i
+            vx = math.cos(angle)
+            vy = math.sin(angle)
+            threading.Timer(0.5 * i, self.spawn_drone, args=("drone_de_surface", vx, vy)).start()
 
         offset = self.nb_drones_surface * 0.5
         for i in range(self.nb_drones_aerien):
-            threading.Timer(offset + 0.5 * i, self.spawn_drone, args=("drone_aerien",)).start()
+            angle = (2 * math.pi / self.nb_drones_aerien) * i
+            vx = math.cos(angle)
+            vy = math.sin(angle)
+            threading.Timer(offset + 0.5 * i, self.spawn_drone, args=("drone_aerien", vx, vy)).start()
 
+    def spawn_drone(self, drone_type, vx, vy):
+        creature_id = self.get_next_creature_id()
+        self.creatures.append(Drone(self.spawn_x, self.spawn_y, self.spawn_x, self.spawn_y, vx, vy, drone_type, self.logger, creature_id))
+
+    def generer_monde(self):
+
+        self.spawn_all_drones()
         
         for i in range(15):
             x = random.randint(0, constant.LARGEUR_SIMULATION - 100)

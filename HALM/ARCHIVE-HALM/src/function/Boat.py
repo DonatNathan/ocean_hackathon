@@ -34,6 +34,9 @@ class Boat:
         self.detached = False
         self.angle = angle
         self.drones = []
+        self.splash_timer = 0
+        self.splash_pos = None
+
 
         boat_center_x = self.x
         boat_center_y = self.y
@@ -110,15 +113,21 @@ class Boat:
                 drone.spawn_y = self.base.y
 
     def create_man_overboard(self):
-        """Randomly create a man overboard once per journey."""
+        """Randomly create a man overboard once per journey, with visual splash."""
         if not self.has_dropped_man:
             self.has_dropped_man = True
             drop_distance = 30
             drop_x = self.x - self.direction_vector[0] * drop_distance
             drop_y = self.y - self.direction_vector[1] * drop_distance
+
             self.man_overboard = HommeALaMer(drop_x, drop_y)
+
+            self.splash_pos = (drop_x, drop_y)
+            self.splash_timer = 120 
+
             return self.man_overboard
         return None
+
 
     def send_drones(self):
         self.detached = True
@@ -168,6 +177,18 @@ class Boat:
 
             for r in (10, 16):
                 pygame.draw.circle(screen, (100, 150, 255), (int(mx), int(my)), r, 1)
+
+        if self.splash_timer > 0 and self.splash_pos:
+            mx, my = self.splash_pos
+            radius = 10 + (120 - self.splash_timer) // 3
+            alpha = max(0, min(255, int((self.splash_timer / 120) * 200)))
+            splash_surface = pygame.Surface((constant.LARGEUR_SIMULATION, constant.HAUTEUR_SIMULATION), pygame.SRCALPHA)
+            pygame.draw.circle(splash_surface, (100, 180, 255, alpha), (int(mx), int(my)), radius, 3)
+            pygame.draw.circle(splash_surface, (180, 220, 255, alpha // 2), (int(mx), int(my)), radius + 5, 1)
+            screen.blit(splash_surface, (0, 0))
+
+            self.splash_timer -= 1
+
 
         if self.detached:
             search_length = math.hypot(constant.LARGEUR_SIMULATION, constant.HAUTEUR_SIMULATION)

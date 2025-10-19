@@ -218,7 +218,7 @@ class Drone:
         if self.temps_depuis_spawn > self.temps_avant_repos and dist_spawn > 10:
                 self.epuise = True
         if self.retour_spawn:
-            if self.gerer_retour_spawn():
+            if self.gerer_retour_spawn(autres_creatures):
                 print(f"[LOG] Drone {self.creature_id} retourne au spawn.")
                 return
 
@@ -245,10 +245,6 @@ class Drone:
             return
         distance_vers_cible = math.dist((self.x, self.y), (self.target[0], self.target[1]))
         temps_necessaire = distance_vers_cible / self.vitesse
-        print("----------------------------------------------------------------")
-        print(temps_necessaire)
-        print(self.temps_avant_repos - self.temps_depuis_spawn)
-        print("----------------------------------------------------------------")
         if temps_necessaire >= self.temps_avant_repos - self.temps_depuis_spawn:
             self.retour_spawn = True
             print(f"[LOG] Drone {self.creature_id} passe en mode retour au spawn.")
@@ -265,14 +261,26 @@ class Drone:
                 "communications_count": len(self.communications_reçues)
             })
 
-    def gerer_retour_spawn(self):
+    def gerer_retour_spawn(self, autres_creatures):
+        base_la_plus_proche = None
+        dist_base_min = float('inf')
+        for creature in autres_creatures:
+            if creature.type_creature == "base":
+                dist = math.dist((self.x, self.y), (creature.x, creature.y))
+                if dist < dist_base_min:
+                    dist_base_min = dist
+                    base_la_plus_proche = creature
         dist_spawn = math.dist((self.x, self.y), (self.spawn_x, self.spawn_y))
-        if dist_spawn < 5:
+        if base_la_plus_proche is not None and dist_base_min < dist_spawn:
+            cible_x, cible_y = base_la_plus_proche.x, base_la_plus_proche.y
+        else:
+            cible_x, cible_y = self.spawn_x, self.spawn_y
+        if math.dist((self.x, self.y), (cible_x, cible_y)) < 5:
             self.entrer_en_repos()
             return True
         else:
-            self.angle = math.atan2(self.spawn_y - self.y, self.spawn_x - self.x)
-        return False
+            self.angle = math.atan2(cible_y - self.y, cible_x - self.x)
+            return False
 
     def entrer_en_repos(self):
         self.en_repos = True

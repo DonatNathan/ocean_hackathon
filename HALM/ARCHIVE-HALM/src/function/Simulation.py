@@ -249,10 +249,14 @@ class Simulation:
                     for i in range(len(boat.drones)):
                         self.creatures.append(boat.drones.pop())
                     self.homme_a_la_mer = boat.man_overboard
+                    for boat in self.boats:
+                        if self.homme_a_la_mer:
+                            boat.send_drones()
+                            for i in range(len(boat.drones)):
+                                self.creatures.append(boat.drones.pop())
                     boat.send_drones()
                 else:
                     boat.create_man_overboard()
-                return boat
         return None
 
     def spawn_drone(self, drone_type, vx, vy):
@@ -386,7 +390,7 @@ class Simulation:
                 self.homme_a_la_mer.decouvert= True
                 self.homme_a_la_mer.dessiner(ecran_simulation)
             if creature.a_trouve_homme_mer and creature.type_creature == "base":
-                self.base_coord = (creature.x, creature.y)
+                self.base_coord = (creature.spawn_x, creature.spawn_y)
                 self.homme_coord = (creature.homme_positions_connues[0], creature.homme_positions_connues[1])
                 self.homme_a_la_mer_decouvert = True
                 self.homme_a_la_mer.decouvert = True
@@ -462,13 +466,15 @@ class Simulation:
             ecran_simulation.blit(text, (constant.LARGEUR_SIMULATION // 2 - text.get_width() // 2, constant.HAUTEUR_SIMULATION // 2))
 
         if(self.base_coord and self.homme_coord):
-            pygame.draw.line(
-                ecran_simulation,
-                constant.ROUGE,
-                self.base_coord,
-                self.homme_coord,
-                width=2
-            )
+            for creature in self.creatures:
+                if creature.type_creature == "base":
+                    pygame.draw.line(
+                        ecran_simulation,
+                        constant.ROUGE,
+                        (creature.spawn_x, creature.spawn_y),
+                        (self.homme_a_la_mer.x, self.homme_a_la_mer.y),
+                        width=2
+                    )
         ecran.blit(ecran_simulation, (0, constant.HAUTEUR_ENTETE))
 
         self.afficher_info(ecran)

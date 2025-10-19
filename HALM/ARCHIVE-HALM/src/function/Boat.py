@@ -34,6 +34,8 @@ class Boat:
         self.detached = False
         self.angle = angle
         self.drones = []
+        self.cone = None
+        self.start_cone = []
 
         boat_center_x = self.x
         boat_center_y = self.y
@@ -111,6 +113,22 @@ class Boat:
 
     def create_man_overboard(self):
         """Randomly create a man overboard once per journey."""
+        search_length = math.hypot(constant.LARGEUR_SIMULATION, constant.HAUTEUR_SIMULATION)
+        search_angle = math.radians(25)
+
+        left_angle = self.angle + math.pi - search_angle
+        right_angle = self.angle + math.pi + search_angle
+
+        left_x = self.x + math.cos(left_angle) * search_length
+        left_y = self.y + math.sin(left_angle) * search_length
+        right_x = self.x + math.cos(right_angle) * search_length
+        right_y = self.y + math.sin(right_angle) * search_length
+        cone_points = [
+            (int(self.x), int(self.y)),
+            (int(left_x), int(left_y)),
+            (int(right_x), int(right_y))
+        ]
+        self.cone = cone_points
         if not self.has_dropped_man:
             self.has_dropped_man = True
             drop_distance = 30
@@ -122,6 +140,7 @@ class Boat:
 
     def send_drones(self):
         self.detached = True
+        self.start_cone = (self.x, self.y)
 
     def display(self, screen):
         """Draw the boat, its base, its drones, and the man overboard if any."""
@@ -168,30 +187,3 @@ class Boat:
 
             for r in (10, 16):
                 pygame.draw.circle(screen, (100, 150, 255), (int(mx), int(my)), r, 1)
-
-        if self.detached:
-            search_length = math.hypot(constant.LARGEUR_SIMULATION, constant.HAUTEUR_SIMULATION)
-            search_angle = math.radians(25)
-
-            left_angle = self.angle + math.pi - search_angle
-            right_angle = self.angle + math.pi + search_angle
-
-            left_x = self.x + math.cos(left_angle) * search_length
-            left_y = self.y + math.sin(left_angle) * search_length
-            right_x = self.x + math.cos(right_angle) * search_length
-            right_y = self.y + math.sin(right_angle) * search_length
-
-            pygame.draw.line(screen, (255, 255, 0), (int(self.x), int(self.y)), (int(left_x), int(left_y)), 2)
-            pygame.draw.line(screen, (255, 255, 0), (int(self.x), int(self.y)), (int(right_x), int(right_y)), 2)
-
-            cone_surface = pygame.Surface((constant.LARGEUR_SIMULATION, constant.HAUTEUR_SIMULATION), pygame.SRCALPHA)
-            cone_points = [
-                (int(self.x), int(self.y)),
-                (int(left_x), int(left_y)),
-                (int(right_x), int(right_y))
-            ]
-
-            pygame.draw.polygon(cone_surface, (255, 255, 0, 60), cone_points)
-            screen.blit(cone_surface, (0, 0))
-
-

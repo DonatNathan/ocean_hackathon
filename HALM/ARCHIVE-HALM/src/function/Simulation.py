@@ -39,7 +39,8 @@ class Simulation:
         self.pause_automatique = False
         self.boats = []
         self.mode = mode
-        
+        self.cone = None
+        self.start_cone = []
         self.base_coord = None
         self.homme_coord = None
         # Nouveaux compteurs de communication
@@ -245,16 +246,32 @@ class Simulation:
             if rect.collidepoint(x, y):
                 print(f"Clicked on boat at ({boat.x:.1f}, {boat.y:.1f})")
                 if boat.has_dropped_man:
+
+                    boat.send_drones()
+                    
+                    self.start_cone = boat.start_cone   
+                    self.cone = boat.cone
+                    boat.base.start_cone = boat.start_cone
+                    boat.base.cone = boat.cone
                     self.creatures.append(boat.base)
-                    for i in range(len(boat.drones)):
-                        self.creatures.append(boat.drones.pop())
+
+                    # Drones
+                    for _ in range(len(boat.drones)):
+                        drone = boat.drones.pop()
+                        drone.start_cone = boat.start_cone
+                        drone.cone = boat.cone
+                        self.creatures.append(drone)
                     self.homme_a_la_mer = boat.man_overboard
-                    for boat in self.boats:
+                    for boat_temp in self.boats:
                         if self.homme_a_la_mer:
                             boat.send_drones()
-                            for i in range(len(boat.drones)):
-                                self.creatures.append(boat.drones.pop())
-                    boat.send_drones()
+                            for i in range(len(boat_temp.drones)):
+                                drone = boat_temp.drones.pop()
+                                drone.cone = self.cone
+                                drone.start_cone = self.start_cone
+                                print("Drone START corrd: ", drone.start_cone)
+                                print("drone cone points: ", drone.cone)
+                                self.creatures.append(drone)
                 else:
                     boat.create_man_overboard()
         return None
@@ -425,6 +442,21 @@ class Simulation:
         pygame.draw.rect(ecran, constant.NOIR, (0, 0, constant.LARGEUR, constant.HAUTEUR_ENTETE))
         ecran_simulation = pygame.Surface((constant.LARGEUR_SIMULATION, constant.HAUTEUR_SIMULATION))
         ecran_simulation.fill(constant.NOIR)
+
+
+        if self.cone and len(self.cone) >= 3:
+            left_pt = self.cone[1]
+            right_pt = self.cone[2]
+
+            pygame.draw.line(ecran_simulation, (255, 255, 0),
+                            (int(self.start_cone[0]), int(self.start_cone[1])),
+                            (int(left_pt[0]), int(left_pt[1])), 2)
+            pygame.draw.line(ecran_simulation, (255, 255, 0), (int(self.start_cone[0]), int(self.start_cone[1])), (int(right_pt[0]), int(right_pt[1])), 2)
+
+            cone_surface = pygame.Surface((constant.LARGEUR_SIMULATION, constant.HAUTEUR_SIMULATION), pygame.SRCALPHA)
+
+            pygame.draw.polygon(cone_surface, (255, 255, 0, 60), self.cone)
+            ecran_simulation.blit(cone_surface, (0, 0))
 
         for zone in self.zones_explorees:
             temp = sum(1 for creature in self.creatures if zone in creature.zones_decouvertes_uniques)

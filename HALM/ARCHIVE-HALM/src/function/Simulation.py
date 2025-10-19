@@ -525,38 +525,6 @@ class Simulation:
             ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_stats))
             y_stats += 20
         
-        # y_commandes = constant.HAUTEUR_ENTETE + (constant.HAUTEUR-constant.HAUTEUR_ENTETE)//2 + 5
-        # pygame.draw.rect(ecran, constant.BLANC, (constant.LARGEUR_SIMULATION + 5, y_commandes, constant.LARGEUR_BARRE_LATERALE - 10, (constant.HAUTEUR-constant.HAUTEUR_ENTETE)//2 - 10), 0, 5)
-        # pygame.draw.rect(ecran, constant.COULEUR_UI_CONTOUR, (constant.LARGEUR_SIMULATION + 5, y_commandes, constant.LARGEUR_BARRE_LATERALE - 10, (constant.HAUTEUR-constant.HAUTEUR_ENTETE)//2 - 10), 1, 5)
-
-        # text_commandes_titre = font_section.render("Commandes et Légende", True, constant.NOIR)
-        # ecran.blit(text_commandes_titre, (constant.LARGEUR_SIMULATION + 15, y_commandes + 5))
-        # y_commandes += 30
-
-        # instructions = [
-        #     "Clic - Changer point de départ", "R - Redémarrer", "1 - Ajouter Drone de Surface",
-        #     "2 - Ajouter Drone Aérien", "Q - Retirer Drone de Surface", "W - Retirer Drone Aérien",
-        #     "Espace - Pause", "L - Sauvegarder logs", "C - Activer/désactiver cercles",
-        #     "S - Sauvegarder stats"
-        # ]
-        
-        # for i, instruction in enumerate(instructions):
-        #     text = font_info.render(instruction, True, constant.NOIR)
-        #     ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_commandes + i * 20))
-
-        # y_commandes += len(instructions) * 20 + 10
-        
-        # legende = [
-        #     "États des Drones:", "• Vert: En repos", "• Orange: Retour au départ",
-        #     "• Croix: Épuisé", "• C:X: X contacts",
-        #     "Drones de Surface: 40s exploration, 20s repos",
-        #     "Drones Aériens: 20s exploration, 15s repos",
-        # ]
-        
-        # for i, ligne in enumerate(legende):
-        #     text = font_info.render(ligne, True, constant.NOIR)
-        #     ecran.blit(text, (constant.LARGEUR_SIMULATION + 15, y_commandes + i * 20))
-        
         if constant.en_pause:
             constant.font = pygame.font.Font(None, 72)
 

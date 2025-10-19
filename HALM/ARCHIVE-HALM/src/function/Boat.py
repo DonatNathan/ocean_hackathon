@@ -194,4 +194,3 @@ class Boat:
             pygame.draw.polygon(cone_surface, (255, 255, 0, 60), cone_points)
             screen.blit(cone_surface, (0, 0))
 
-

@@ -267,12 +267,13 @@ class Simulation:
         if (mode == "classic"):
             self.spawn_all_drones()
         
-        for i in range(15):
-            x = random.randint(0, constant.LARGEUR_SIMULATION - 100)
-            y = random.randint(0, constant.HAUTEUR_SIMULATION - 100)
-            constant.largeur = random.randint(20, 80)
-            hauteur = random.randint(20, 80)
-            self.obstacles.append(Obstacle(x, y, constant.largeur, hauteur))
+            for i in range(15):
+                x = random.randint(0, constant.LARGEUR_SIMULATION - 100)
+                y = random.randint(0, constant.HAUTEUR_SIMULATION - 100)
+                constant.largeur = random.randint(20, 80)
+                hauteur = random.randint(20, 80)
+                self.obstacles.append(Obstacle(x, y, constant.largeur, hauteur))
+
         surface_totale = constant.LARGEUR_SIMULATION * constant.HAUTEUR_SIMULATION
         surface_brouillage_cible = surface_totale * (self.pourcentage_brouillage / 100.0)
         surface_brouillage_actuelle = 0

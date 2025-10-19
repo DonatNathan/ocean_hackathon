@@ -54,6 +54,8 @@ class Drone:
         self.derniere_position = (x, y)
         self.zones_decouvertes_uniques = set()
         self.temps_premiere_decouverte_homme_mer = None
+        self.cone = None
+        self.start_cone = []
         
         # Caractéristiques selon le type
         if type_creature == "drone_de_surface":
@@ -61,7 +63,7 @@ class Drone:
             self.couleur = constant.ROUGE
             self.couleur_trouve = constant.ROUGE_CLAIR
             self.taille = 3
-            self.zone_decouverte = 15
+            self.zone_decouverte = 20
             self.temps_avant_repos = 24
             self.duree_repos = 2
             self.rayon_communication = 50
@@ -70,7 +72,7 @@ class Drone:
             self.couleur = constant.JAUNE
             self.couleur_trouve = constant.JAUNE
             self.taille = 4
-            self.zone_decouverte = 30
+            self.zone_decouverte = 50
             self.temps_avant_repos = 10
             self.duree_repos = 1
             self.rayon_communication = 80
@@ -204,7 +206,6 @@ class Drone:
     
     def deplacer(self, obstacles, homme_a_la_mer, autres_creatures, brouillages, simulation):
 
-        print("X: ", self.x, "Y: ", self.y)
         self.target = None
         if self.epuise:
             return
@@ -339,6 +340,59 @@ class Drone:
                 return True
         return False
     
+
+    def point_in_triangle(self, pt, v1, v2, v3):
+        """Vérifie si un point pt est dans le triangle (v1, v2, v3)"""
+        x, y = pt
+        x1, y1 = v1
+        x2, y2 = v2
+        x3, y3 = v3
+
+        def sign(p1, p2, p3):
+            return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1])
+
+        b1 = sign((x, y), (x1, y1), (x2, y2)) < 0.0
+        b2 = sign((x, y), (x2, y2), (x3, y3)) < 0.0
+        b3 = sign((x, y), (x3, y3), (x1, y1)) < 0.0
+
+        return (b1 == b2) and (b2 == b3)
+
+
+    def a_star(self, start, goal, grid):
+        """
+        start, goal : tuple (x, y) en coordonnées de cellules
+        grid : dict avec (x,y) : 0 (libre) ou 1 (obstacle)
+        retourne une liste de cellules [(x1,y1), (x2,y2), ...] pour aller de start à goal
+        """
+
+        def heuristic(a, b):
+            # Distance Euclidienne
+            return ((a[0]-b[0])**2 + (a[1]-b[1])**2) ** 0.5
+
+        open_set = []
+        heapq.heappush(open_set, (0 + heuristic(start, goal), 0, start, [start]))  # (f, g, current, path)
+        visited = set()
+
+        while open_set:
+            f, g, current, path = heapq.heappop(open_set)
+            if current in visited:
+                continue
+            visited.add(current)
+
+            if current == goal:
+                return path[1:]  # renvoie le chemin à suivre, excluant la cellule actuelle
+
+            x, y = current
+            # Voisins 4 directions (haut, bas, gauche, droite)
+            neighbors = [(x+1,y), (x-1,y), (x,y+1), (x,y-1)]
+            for nx, ny in neighbors:
+                if (nx, ny) in visited:
+                    continue
+                if grid.get((nx, ny), 1) == 1:  # 1 = obstacle ou zone interdite
+                    continue
+                heapq.heappush(open_set, (g+1 + heuristic((nx, ny), goal), g+1, (nx, ny), path + [(nx, ny)]))
+
+        return [] 
     def explorer(self, obstacles, homme_a_la_mer):
         if self.a_trouve_homme_mer:
             self.retour_spawn = True
@@ -346,67 +400,126 @@ class Drone:
 
         cell_size = 10
         max_range = 200
-        R = max_range // cell_size
+        cone_cells_to_explore = []
 
-        cx = int(self.x // cell_size)
-        cy = int(self.y // cell_size)
+        if self.cone is not None and self.target is None:
+            v1, v2, v3 = self.cone
+            
+            # Définir la zone de recherche comme le rectangle englobant du cône
+            min_x = max(0, int(min(v1[0], v2[0], v3[0]) // cell_size))
+            max_x = min(constant.LARGEUR_SIMULATION // cell_size, int(max(v1[0], v2[0], v3[0]) // cell_size) + 1)
+            min_y = max(0, int(min(v1[1], v2[1], v3[1]) // cell_size))
+            max_y = min(constant.HAUTEUR_SIMULATION // cell_size, int(max(v1[1], v2[1], v3[1]) // cell_size) + 1)
+            
+            # Créer toutes les directions possibles dans le rectangle englobant
+            directions = []
+            for tx in range(min_x, max_x):
+                for ty in range(min_y, max_y):
+                    directions.append((tx, ty))
+            
+            # Mélanger aléatoirement comme dans l'algo original
+            random.shuffle(directions)
+            
+            best_dist = float("inf")
+            best_targets = []
+            
+            for tx, ty in directions:
+                # Vérifier si la cellule est dans le cône
+                cx_cell = tx * cell_size + cell_size / 2
+                cy_cell = ty * cell_size + cell_size / 2
+                if not self.point_in_triangle((cx_cell, cy_cell), v1, v2, v3):
+                    continue
+                    
+                zone = (tx, ty)
+                if zone in self.zones_decouvertes_uniques:
+                    continue
+                    
+                if self.zone_contient_obstacle(tx, ty, obstacles):
+                    self.zones_decouvertes_uniques.add(zone)
+                    continue
+                    
+                target_x = tx * cell_size + cell_size / 2
+                target_y = ty * cell_size + cell_size / 2
+                dist = math.hypot(target_x - self.x, target_y - self.y)
+                
+                if dist < best_dist - 1e-6:
+                    best_dist = dist
+                    best_targets = [(target_x, target_y)]
+                elif abs(dist - best_dist) <= 1e-6:
+                    best_targets.append((target_x, target_y))
+                    
+            if best_targets:
+                self.target = random.choice(best_targets)
 
-        self.target = None
-        best_dist = float("inf")
-        best_targets = []
-        directions = [(dx, dy) for dx in range(-R, R) for dy in range(-R, R)]
-        random.shuffle(directions)
-        for dx, dy in directions:
-            tx, ty = cx + dx, cy + dy
-            if not (0 <= tx < constant.LARGEUR_SIMULATION // cell_size and 0 <= ty < constant.HAUTEUR_SIMULATION // cell_size):
-                continue
-            zone = (tx, ty)
-            if zone in self.zones_decouvertes_uniques:
-                continue
-            if self.zone_contient_obstacle(tx, ty, obstacles):
-                self.zones_decouvertes_uniques.add(zone)
-                continue
-            target_x = tx * cell_size + cell_size / 2
-            target_y = ty * cell_size + cell_size / 2
-            dist = math.hypot(target_x - self.x, target_y - self.y)
-            if dist < best_dist - 1e-6:
-                best_dist = dist
-                best_targets = [(target_x, target_y)]
-            elif abs(dist - best_dist) <= 1e-6:
-                best_targets.append((target_x, target_y))
-        if best_targets:
-            self.target = random.choice(best_targets)
+        if self.target is None:
+            R = max_range // cell_size
+            cx = int(self.x // cell_size)
+            cy = int(self.y // cell_size)
+
+            best_dist = float("inf")
+            best_targets = []
+            directions = [(dx, dy) for dx in range(-R, R) for dy in range(-R, R)]
+            random.shuffle(directions)
+            for dx, dy in directions:
+                tx, ty = cx + dx, cy + dy
+                if not (0 <= tx < constant.LARGEUR_SIMULATION // cell_size and
+                        0 <= ty < constant.HAUTEUR_SIMULATION // cell_size):
+                    continue
+                zone = (tx, ty)
+                if zone in self.zones_decouvertes_uniques:
+                    continue
+                if self.zone_contient_obstacle(tx, ty, obstacles):
+                    self.zones_decouvertes_uniques.add(zone)
+                    continue
+                target_x = tx * cell_size + cell_size / 2
+                target_y = ty * cell_size + cell_size / 2
+                dist = math.hypot(target_x - self.x, target_y - self.y)
+                if dist < best_dist - 1e-6:
+                    best_dist = dist
+                    best_targets = [(target_x, target_y)]
+                elif abs(dist - best_dist) <= 1e-6:
+                    best_targets.append((target_x, target_y))
+            if best_targets:
+                self.target = random.choice(best_targets)
+
         if not self.en_repos and not self.retour_spawn:
             if self.target is not None:
                 self.angle = math.atan2(self.target[1] - self.y, self.target[0] - self.x)
             else:
                 self.angle += random.uniform(-0.3, 0.3)
-        if self.type_creature == "drone_de_surface" and self.target is not None:
-            if self.contournement_actif:
-                self.frames_contournement -= 1
-                if self.frames_contournement <= 0:
-                    self.contournement_actif = False
-            else:
-                dx = self.target[0] - self.x
-                dy = self.target[1] - self.y
-                distance_vers_cible = math.hypot(dx, dy)
 
-                if distance_vers_cible > 0:
-                    pas = max(1, int(distance_vers_cible / 0.1))
-                    obstacle_trouve = None
-                    for i in range(1, pas + 1):
-                        t = i / pas
-                        check_x = self.x + dx * t
-                        check_y = self.y + dy * t
-                        for obstacle in obstacles:
-                            if obstacle.rect.collidepoint(check_x, check_y):
-                                obstacle_trouve = obstacle
+            if not self.en_repos and not self.retour_spawn:
+                if self.target is not None:
+                    self.angle = math.atan2(self.target[1] - self.y, self.target[0] - self.x)
+                else:
+                    self.angle += random.uniform(-0.3, 0.3)
+
+            if self.type_creature == "drone_de_surface" and self.target is not None:
+                if self.contournement_actif:
+                    self.frames_contournement -= 1
+                    if self.frames_contournement <= 0:
+                        self.contournement_actif = False
+                else:
+                    dx = self.target[0] - self.x
+                    dy = self.target[1] - self.y
+                    distance_vers_cible = math.hypot(dx, dy)
+
+                    if distance_vers_cible > 0:
+                        pas = max(1, int(distance_vers_cible / 0.1))
+                        obstacle_trouve = None
+                        for i in range(1, pas + 1):
+                            t = i / pas
+                            check_x = self.x + dx * t
+                            check_y = self.y + dy * t
+                            for obstacle in obstacles:
+                                if obstacle.rect.collidepoint(check_x, check_y):
+                                    obstacle_trouve = obstacle
+                                    break
+                            if obstacle_trouve:
                                 break
-                        if obstacle_trouve:
-                            break
 
-                    if obstacle_trouve:
-                        self.demarrer_contournement(obstacle_trouve, obstacles)
+                        if obstacle_trouve:
+                            self.demarrer_contournement(obstacle_trouve, obstacles)
 
     def demarrer_contournement(self, obstacle, obstacles_liste):
         """
@@ -558,7 +671,6 @@ class Drone:
                     width=2
                 )
 
-                # --- Blit sur l'écran ---
                 ecran_simulation.blit(
                     surface_communication,
                     (self.x - self.rayon_communication, self.y - self.rayon_communication)

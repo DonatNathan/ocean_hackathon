@@ -36,6 +36,9 @@ class Boat:
         self.drones = []
         self.cone = None
         self.start_cone = []
+        self.splash_timer = 0
+        self.splash_pos = None
+
 
         boat_center_x = self.x
         boat_center_y = self.y
@@ -132,15 +135,38 @@ class Boat:
         if not self.has_dropped_man:
             self.has_dropped_man = True
             drop_distance = 30
-            drop_x = self.x - self.direction_vector[0] * drop_distance
-            drop_y = self.y - self.direction_vector[1] * drop_distance
+            drop_x = self.x - self.direction_vector[0] * drop_distance + random.randint(10, 50)
+            drop_y = self.y - self.direction_vector[1] * drop_distance +  random.randint(10, 50)
+
             self.man_overboard = HommeALaMer(drop_x, drop_y)
+
+            self.splash_pos = (drop_x, drop_y)
+            self.splash_timer = 120
+
             return self.man_overboard
         return None
 
+
     def send_drones(self):
+        
+        search_length = math.hypot(constant.LARGEUR_SIMULATION, constant.HAUTEUR_SIMULATION)
+        search_angle = math.radians(25)
+        left_angle = self.angle + math.pi - search_angle
+        right_angle = self.angle + math.pi + search_angle
+
+        left_x = self.x + math.cos(left_angle) * search_length
+        left_y = self.y + math.sin(left_angle) * search_length
+        right_x = self.x + math.cos(right_angle) * search_length
+        right_y = self.y + math.sin(right_angle) * search_length
+
+        cone_points = [
+            (int(self.x), int(self.y)),
+            (int(left_x), int(left_y)),
+            (int(right_x), int(right_y))
+        ]
         self.detached = True
         self.start_cone = (self.x, self.y)
+        self.cone = cone_points
 
     def display(self, screen):
         """Draw the boat, its base, its drones, and the man overboard if any."""
@@ -187,3 +213,41 @@ class Boat:
 
             for r in (10, 16):
                 pygame.draw.circle(screen, (100, 150, 255), (int(mx), int(my)), r, 1)
+
+        if self.splash_timer > 0 and self.splash_pos:
+            mx, my = self.splash_pos
+            radius = 10 + (120 - self.splash_timer) // 3
+            alpha = max(0, min(255, int((self.splash_timer / 120) * 200)))
+            splash_surface = pygame.Surface((constant.LARGEUR_SIMULATION, constant.HAUTEUR_SIMULATION), pygame.SRCALPHA)
+            pygame.draw.circle(splash_surface, (100, 180, 255, alpha), (int(mx), int(my)), radius, 3)
+            pygame.draw.circle(splash_surface, (180, 220, 255, alpha // 2), (int(mx), int(my)), radius + 5, 1)
+            screen.blit(splash_surface, (0, 0))
+
+            self.splash_timer -= 1
+
+
+        if self.detached:
+            search_length = math.hypot(constant.LARGEUR_SIMULATION, constant.HAUTEUR_SIMULATION)
+            search_angle = math.radians(25)
+
+            left_angle = self.angle + math.pi - search_angle
+            right_angle = self.angle + math.pi + search_angle
+
+            left_x = self.x + math.cos(left_angle) * search_length
+            left_y = self.y + math.sin(left_angle) * search_length
+            right_x = self.x + math.cos(right_angle) * search_length
+            right_y = self.y + math.sin(right_angle) * search_length
+
+            pygame.draw.line(screen, (255, 255, 0), (int(self.x), int(self.y)), (int(left_x), int(left_y)), 2)
+            pygame.draw.line(screen, (255, 255, 0), (int(self.x), int(self.y)), (int(right_x), int(right_y)), 2)
+
+            cone_surface = pygame.Surface((constant.LARGEUR_SIMULATION, constant.HAUTEUR_SIMULATION), pygame.SRCALPHA)
+            cone_points = [
+                (int(self.x), int(self.y)),
+                (int(left_x), int(left_y)),
+                (int(right_x), int(right_y))
+            ]
+
+            # pygame.draw.polygon(cone_surface, (255, 255, 0, 60), cone_points)
+            screen.blit(cone_surface, (0, 0))
+

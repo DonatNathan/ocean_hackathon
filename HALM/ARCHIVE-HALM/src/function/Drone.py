@@ -203,6 +203,8 @@ class Drone:
         return communications_etablies
     
     def deplacer(self, obstacles, homme_a_la_mer, autres_creatures, brouillages, simulation):
+
+        print("X: ", self.x, "Y: ", self.y)
         self.target = None
         if self.epuise:
             return
@@ -210,6 +212,7 @@ class Drone:
         self.temps_depuis_spawn += 1 / constant.FPS
 
         if not self.en_repos:
+            print("In if")
             self.verifier_communications(autres_creatures, brouillages, simulation)
 
         dist_spawn = math.sqrt((self.x - self.spawn_x)**2 + (self.y - self.spawn_y)**2)

@@ -355,11 +355,32 @@ class Simulation:
     
     def mettre_a_jour(self, ecran_simulation):
 
-        for boat in self.boats:
-            boat.move()
-            if boat.detached:
-                for drone in boat.drones:
-                    drone.deplacer(self.obstacles, boat.man_overboard, boat.drones, self.brouillages, self)
+        self.zones_explorees = set()
+
+        if self.mode == "boat":
+            for boat in self.boats:
+                boat.move()
+                if boat.detached:
+                    for drone in boat.drones:
+                        drone.deplacer(self.obstacles, boat.man_overboard, boat.drones, self.brouillages, self)
+                        if drone.a_trouve_homme_mer and drone.type_creature != "base":
+                            print("In first if")
+                            boat.man_overboard.decouvert= True
+                            boat.man_overboard.dessiner(ecran_simulation)
+                        if drone.a_trouve_homme_mer and drone.type_creature == "base":
+                            print("In second if")
+                            boat.base.x = drone.x
+                            boat.base.y = drone.y
+                            self.homme_coord = (drone.homme_positions_connues[0], drone.homme_positions_connues[1])
+                            boat.man_found = True
+                            boat.man_overboard.decouvert = True
+                            self.temps_decouverte = pygame.time.get_ticks()
+                            self.simulation_reussie = True
+                            self.premiere_decouverte_homme_mer = drone.temps_premiere_decouverte_homme_mer
+                            self.qui_a_trouve_homme_mer = f"{drone.type_creature}_{drone.creature_id}"
+                            # self.pause_automatique = True
+                        self.zones_explorees.update(drone.zone_exploree)
+
 
         if not self.homme_a_la_mer_decouvert and all(c.epuise for c in self.creatures):
             if not self.pause_automatique:
@@ -395,7 +416,6 @@ class Simulation:
                         "homme_a_la_mer_position": [self.homme_a_la_mer.x, self.homme_a_la_mer.y],
                         "winner_communications": len(creature.communications_reçues)
                     })
-        self.zones_explorees = set()
         for creature in self.creatures:
             self.zones_explorees.update(creature.zone_exploree)
         

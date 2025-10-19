@@ -60,8 +60,6 @@ class Boat:
             (half_width, half_height),
         ]
 
-        self.drones.append(self.base)
-
         for i, (ox, oy) in enumerate(offsets, start=1):
             rotated_x = ox * math.cos(self.angle) - oy * math.sin(self.angle)
             rotated_y = ox * math.sin(self.angle) + oy * math.cos(self.angle)
@@ -99,8 +97,8 @@ class Boat:
             (half_width, half_height),
         ]
 
-        # self.base.x = self.x
-        # self.base.y = self.y
+        self.base.x = self.x
+        self.base.y = self.y
 
         for drone, (ox, oy) in zip(self.drones, offsets):
             if not self.detached:
@@ -108,8 +106,8 @@ class Boat:
                 rotated_y = ox * math.sin(self.angle) + oy * math.cos(self.angle)
                 drone.x = self.x + rotated_x
                 drone.y = self.y + rotated_y
-                drone.spawn_x = self.x
-                drone.spawn_y = self.y
+                drone.spawn_x = self.base.x
+                drone.spawn_y = self.base.y
 
     def create_man_overboard(self):
         """Randomly create a man overboard once per journey."""

@@ -243,8 +243,11 @@ class Simulation:
             print("Boat: ", boat.x, boat.y)
             rect = pygame.Rect(boat.x - boat.sizeX/2, boat.y - boat.sizeY/2, boat.sizeX, boat.sizeY)
             if rect.collidepoint(x, y):
-                print(f"✅ Clicked on boat at ({boat.x:.1f}, {boat.y:.1f})")
+                print(f"Clicked on boat at ({boat.x:.1f}, {boat.y:.1f})")
                 if boat.has_dropped_man:
+                    for i in range(len(boat.drones)):
+                        self.creatures.append(boat.drones.pop())
+                    self.homme_a_la_mer = boat.man_overboard
                     boat.send_drones()
                 else:
                     boat.create_man_overboard()
@@ -360,26 +363,9 @@ class Simulation:
         if self.mode == "boat":
             for boat in self.boats:
                 boat.move()
-                if boat.detached:
-                    for drone in boat.drones:
-                        drone.deplacer(self.obstacles, boat.man_overboard, boat.drones, self.brouillages, self)
-                        if drone.a_trouve_homme_mer and drone.type_creature != "base":
-                            print("In first if")
-                            boat.man_overboard.decouvert= True
-                            boat.man_overboard.dessiner(ecran_simulation)
-                        if drone.a_trouve_homme_mer and drone.type_creature == "base":
-                            print("In second if")
-                            boat.base.x = drone.x
-                            boat.base.y = drone.y
-                            self.homme_coord = (drone.homme_positions_connues[0], drone.homme_positions_connues[1])
-                            boat.man_found = True
-                            boat.man_overboard.decouvert = True
-                            self.temps_decouverte = pygame.time.get_ticks()
-                            self.simulation_reussie = True
-                            self.premiere_decouverte_homme_mer = drone.temps_premiere_decouverte_homme_mer
-                            self.qui_a_trouve_homme_mer = f"{drone.type_creature}_{drone.creature_id}"
-                            # self.pause_automatique = True
-                        self.zones_explorees.update(drone.zone_exploree)
+                # if boat.detached:
+                #     for drone in boat.drones:
+                #         drone.deplacer(self.obstacles, boat.man_overboard, boat.drones, self.brouillages, self)
 
 
         if not self.homme_a_la_mer_decouvert and all(c.epuise for c in self.creatures):

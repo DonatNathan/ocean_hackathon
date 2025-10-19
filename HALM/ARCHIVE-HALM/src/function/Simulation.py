@@ -444,7 +444,6 @@ class Simulation:
             self.homme_a_la_mer.dessiner(ecran_simulation)
 
         for boat in self.boats:
-            # print("Boat displayed")
             boat.display(ecran_simulation)
         
         for creature in self.creatures:

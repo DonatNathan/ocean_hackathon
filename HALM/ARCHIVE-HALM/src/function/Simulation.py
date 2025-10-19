@@ -244,7 +244,7 @@ class Simulation:
             rect = pygame.Rect(boat.x - boat.sizeX/2, boat.y - boat.sizeY/2, boat.sizeX, boat.sizeY)
             if rect.collidepoint(x, y):
                 print(f"Clicked on boat at ({boat.x:.1f}, {boat.y:.1f})")
-                if boat.has_dropped_man:
+                if boat.has_dropped_man and not boat.detached:
                     self.creatures.append(boat.base)
                     for i in range(len(boat.drones)):
                         self.creatures.append(boat.drones.pop())

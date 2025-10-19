@@ -123,7 +123,7 @@ class Boat:
             self.man_overboard = HommeALaMer(drop_x, drop_y)
 
             self.splash_pos = (drop_x, drop_y)
-            self.splash_timer = 120 
+            self.splash_timer = 120
 
             return self.man_overboard
         return None

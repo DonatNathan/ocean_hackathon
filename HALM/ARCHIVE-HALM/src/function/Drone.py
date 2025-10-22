@@ -63,19 +63,19 @@ class Drone:
             self.couleur = constant.ROUGE
             self.couleur_trouve = constant.ROUGE_CLAIR
             self.taille = 3
-            self.zone_decouverte = 20
+            self.zone_decouverte = 8
             self.temps_avant_repos = 24
             self.duree_repos = 2
-            self.rayon_communication = 50
+            self.rayon_communication = 40
         elif type_creature == "drone_aerien":
             self.vitesse = constant.FACTEUR_ACCELERATION * 277 / constant.FPS
             self.couleur = constant.JAUNE
             self.couleur_trouve = constant.JAUNE
             self.taille = 4
-            self.zone_decouverte = 50
+            self.zone_decouverte = 16
             self.temps_avant_repos = 10
             self.duree_repos = 1
-            self.rayon_communication = 80
+            self.rayon_communication = 20
         elif type_creature == "base":
             self.vitesse = 0
             self.couleur = constant.VERT
